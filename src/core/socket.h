@@ -116,7 +116,7 @@ namespace Net {
         ///
         /// Returns a valid `Address` if input arguments is correct.
         static Address
-        MakeBind(const Protocol protocol = Protocol::TCP, const Family family = Family::IPv4, const port_t port = 0);
+        MakeBind(const port_t port = 0, const Protocol protocol = Protocol::TCP, const Family family = Family::IPv4);
 
         /// Convert internal os-specific network address to string.
         std::string ConvertToString() const;

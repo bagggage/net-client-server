@@ -333,6 +333,22 @@ Socket Socket::Accept(Address& outRemoteAddress) {
     return result;
 }
 
+Socket Socket::Accept() {
+    LIBPOG_ASSERT(IsListening(), "Socket must listen");
+
+    Socket result;
+    socklen_t sockSize = 0;
+
+    result.osSocket = accept(osSocket, nullptr, nullptr);
+    if (result.osSocket == INVALID_SOCKET) [[unlikely]] {
+        status = static_cast<Status>(GetLastSystemError());
+        return result;
+    }
+
+    result.state = State::Connected;
+    return result;
+}
+
 uint Socket::Send(const char* data, const uint size) {
     LIBPOG_ASSERT(IsConnected(), "Socket must be connected");
 
