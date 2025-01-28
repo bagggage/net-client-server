@@ -180,7 +180,7 @@ Address Address::FromDomain(const char* domainStr, const port_t port, const Prot
     return result;
 }
 
-Address Address::MakeBind(const Protocol protocol, const Family family, const port_t port) {
+Address Address::MakeBind(const port_t port, const Protocol protocol, const Family family) {
     Address result;
     if (protocol == Protocol::None || family == Family::None) {
         return result;
