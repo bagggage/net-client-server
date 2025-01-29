@@ -67,7 +67,8 @@ namespace Msg {
         static BuildProxy Build(const Opcodes opcode) { return BuildProxy(opcode); }
 
         inline const Header& GetHeader() const { return header; }
-        inline uint16_t GetSize() const { return header.dataSize; }
+        inline uint16_t GetSize() const  { return header.dataSize + sizeof(Header); }
+        inline uint16_t GetDataSize() const { return header.dataSize; }
 
         template<typename T>
         inline T* GetDataAs() { return reinterpret_cast<T*>(&data[0]); }
