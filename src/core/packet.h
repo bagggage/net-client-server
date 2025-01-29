@@ -30,26 +30,24 @@ namespace Msg {
                 header->opcode = opcode; 
             }
 
-            inline void Append(const void* dataPtr, const uint16_t size) {
+            inline BuildProxy& Append(const void* dataPtr, const uint16_t size) {
                 const auto bufferSize = buffer.size();
                 buffer.resize(bufferSize + size);
                 std::memcpy(buffer.data() + bufferSize, dataPtr, size);
+                return *this;
             }
 
             template<typename T>
-            inline void Append(const T data) {
+            inline BuildProxy& Append(const T& data) {
                 buffer.resize(buffer.size() + sizeof(data));
                 T* dataDest = reinterpret_cast<T*>(buffer.data() + buffer.size() - sizeof(data));
 
                 *dataDest = data;
+                return *this;
             }
 
-            template<typename T>
-            inline void Append(const T& data) {
-                buffer.resize(buffer.size() + sizeof(data));
-                T* dataDest = reinterpret_cast<T*>(buffer.data() + buffer.size() - sizeof(data));
-
-                *dataDest = data;
+            inline BuildProxy& Append(const char* string) {
+                return Append(string, std::strlen(string) + 1);
             }
 
             inline const Packet* Complete() {
@@ -77,6 +75,8 @@ namespace Msg {
         inline const T* GetDataAs() const { return reinterpret_cast<T*>(&data[0]); }
 
         inline bool Is(const Opcodes opcode) const { return header.opcode == opcode; }
+
+        inline const char* RawPtr() const { return reinterpret_cast<const char*>(this); }
     };
 }
 
