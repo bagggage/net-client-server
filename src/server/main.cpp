@@ -1,84 +1,108 @@
-#include "utils.h"
+#include "args.h"
+#include "message.h"
 #include "socket.h"
+#include "server.h"
 
 #include <iostream>
-#include <string>
-#include <ctime>
+#include <filesystem>
 
-#define SERVER_PORT 8088
+struct ServerConfig {
+    Net::Address::port_t port = Msg::DEFAULT_SERVER_PORT;
+    const char* hostFilesDirectory = Server::DEFAULT_FILES_DIR;
+};
 
-void HandleCommand(const std::string& command, Net::Socket& clientSock) {
-    if (command == "ECHO") {
-        char buffer[256] = {0};
-        uint num = clientSock.Receive(buffer, sizeof(buffer));
-        if (num > 0) {
-            std::string echoData(buffer, num);
-            std::cout << "ECHO data received: " << echoData << std::endl;
-            clientSock.Send(echoData.c_str(), echoData.size());
-        } else {
-            std::cerr << "Failed to receive ECHO data." << std::endl;
-        }
-    } else if (command == "TIME") {
-        auto now = time(nullptr);
-        std::string response = std::ctime(&now);
-        clientSock.Send(response.c_str(), response.size());
-    } else {
-        std::string response = "Unknown command";
-        clientSock.Send(response.c_str(), response.size());
-    }
+static void PrintHelp() {
+    std::cout <<
+        "Usage: server [options]\n"
+        "  -port <port>\tListen port number.\n"
+        "  -p\n"
+        "  -dir <path>\tSpecify directory to host.\n"
+        "  -d\n"
+        "  -help\tShow this help.\n"
+        "  -h\n";
+    ;
+
+    exit(EXIT_SUCCESS);
 }
 
-void HandleClient(Net::Socket& clientSock) {
-    while (true) {
-        char buffer[256] = {0};
-        uint num = clientSock.Receive(buffer, sizeof(buffer));
-        if (num > 0) {
-            std::string command(buffer, num);
-            std::cout << "Received command: " << command << std::endl;
+static bool ParseServerArgs(int argc, const char** argv, ServerConfig& outConfig) {
+    ArgIterator argIter(argc, argv);
+    bool result = true;
+    bool printHelp = false;
 
-            HandleCommand(command, clientSock);
+    while (argIter.Next()) {
+        if (argIter.IsValue()) [[unlikely]] {
+            std::cerr << "Unexpected argument: \"" << argIter.Get() << "\"\n";
         } else {
-            std::cerr << "Failed to receive data or connection closed." << std::endl;
-            break;
+            const auto value = argIter.GetAsOption();
+
+            if (value == "port" || value == "p") {
+                result &= RequireArgParameter<Net::Address::port_t>(
+                    argIter,
+                    "Expected port number: -port, p <port number>.",
+                    outConfig.port
+                );
+            } else if (value == "dir" || value == "d") {
+                result &= RequireArgParameter<const char*>(
+                    argIter,
+                    "Expected host directory: -dir, d <directory path>.",
+                    outConfig.hostFilesDirectory
+                );
+            } else if (value == "help" || value == "h") {
+                printHelp = true;
+            } else {
+                std::cerr << "Unknown argument: \"" << argIter.Get() << "\", use \"-help\" to see list of arguments.\n";
+            }
         }
     }
 
-    clientSock.Close();
-    std::cout << "Client connection closed." << std::endl;
+    if (printHelp) PrintHelp();
+
+    return result;
 }
 
-int main() {
-    Net::Address bindAddress = Net::Address::MakeBind(SERVER_PORT);
-    LIBPOG_ASSERT(bindAddress.IsValid(), "Bind address must be valid");
-
-    Net::Socket serverSock(Net::Address::Family::IPv4);
-    LIBPOG_ASSERT(serverSock.IsOpen(), "Socket must be open");
-
-    Net::Address::port_t port = serverSock.Listen(bindAddress);
-    if (!serverSock.IsListening()) {
-        std::cerr << "Socket is not listening. Exit." << std::endl;
-        return -1;
+int main(int argc, const char** argv) {
+    // Read command line arguments
+    ServerConfig config;
+    if (ParseServerArgs(argc, argv, config) == false) [[unlikely]] {
+        std::cerr << "Incorrect input.\n";
+        return EXIT_FAILURE;
     }
 
-    std::cout << "Socket is listening on port: " << port << std::endl;
+    if (std::filesystem::exists(config.hostFilesDirectory) == false) {
+        std::cout << "There is no host directory: '" << config.hostFilesDirectory << "'.\n";
+
+        try {
+            std::filesystem::create_directories(config.hostFilesDirectory);
+        }
+        catch (const std::filesystem::filesystem_error err) {
+            std::cerr << "Cannot create host directory: " << err.what() << '\n';
+            return EXIT_FAILURE;
+        };
+
+        std::cout << "Host directory was succefully created.\n";
+    } else if (std::filesystem::is_directory(config.hostFilesDirectory) == false) {
+        std::cerr << config.hostFilesDirectory << ": is not a directory.";
+        return EXIT_FAILURE;
+    }
+
+    Server server(config.port);
+    server.SetHostDirectory(config.hostFilesDirectory);
 
     while (true) {
-        std::cout << "Waiting for a new connection..." << std::endl;
-        Net::Socket clientSock = serverSock.Accept(bindAddress);
+        const int clientIndex = server.Accept();
 
-        if (clientSock.IsOpen()) {
-            std::cout << "Client connected." << std::endl;
-            HandleClient(clientSock);
-        } else {
-            std::cerr << "Failed to accept a client connection." << std::endl;
+        std::cout << "After accept\n";
+
+        if (clientIndex == Server::INVALID_CLIENT_INDEX) continue;
+
+        while (true) {
+            if (server.Handle(clientIndex) == false) [[unlikely]] break;
         }
+
+        std::cout << "Client disconnected?\n";
+        break;
     }
 
-    serverSock.Close();
-
-    LIBPOG_ASSERT(serverSock.GetState() == Net::Socket::State::None, "Socket must be in None state");
-    LIBPOG_ASSERT(!serverSock.IsOpen(), "Socket must be closed");
-
-    std::cout << "Server shut down. Goodbye!" << std::endl;
-    return 0;
+    return EXIT_SUCCESS;
 }
