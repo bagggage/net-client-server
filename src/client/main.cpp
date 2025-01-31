@@ -41,31 +41,41 @@ void helloCmd(std::string_view name) {
 void connect(std::string ip, unsigned short port) {
     Client& client = Client::GetInstance();
 
-    client.Connect(ip, port);
+    if (!client.Connect(ip, port)) {
+        std::cout << "Client cant be connected\n";
+    }
 }
 
 void echo(std::string message) {
     Client& client = Client::GetInstance();
 
-    client.SendEcho(message);
+    if (!client.SendEcho(message)) {
+        std::cout << "Error while sending ECHO command\n";
+    }
 }
 
 void time() {
     Client& client = Client::GetInstance();
 
-    client.SendTime();
+    if (!client.SendTime()) {
+        std::cout << "Error while sending TIME command\n";
+    }
 }
 
 void download(std::string fileName) {
     Client& client = Client::GetInstance();
 
-    client.SendDownload(fileName);
+    if (!client.SendDownload(fileName)) {
+        std::cout << "Error while sending DOWNLOAD command\n";
+    }
 }
 
 void upload(std::string fileName) {
     Client& client = Client::GetInstance();
 
-    client.SendUpload(fileName);
+    if (!client.SendUpload(fileName)) {
+        std::cout << "Error while sending UPLOAD command\n";
+    }
 }
 
 int main(int argc, const char** argv) {
