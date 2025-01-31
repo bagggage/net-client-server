@@ -167,6 +167,8 @@ namespace Net {
         // Move semantic.
         Socket(Socket&& other) noexcept {
             osSocket = other.osSocket;
+            status = other.status;
+            state = other.state;
             other.osSocket = INVALID_SOCKET;
         }
         // Socket cannot be copied.
