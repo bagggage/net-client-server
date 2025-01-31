@@ -8,6 +8,7 @@ namespace Msg {
         Echo,
         Time,
         Download,
+        Upload,
 
         MAX
     };
