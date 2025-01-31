@@ -30,17 +30,25 @@ void connect(std::string ip, unsigned short port) {
 void echo(std::string message) {
     Client& client = Client::GetInstance();
 
-    if (!client.SendEcho(message)) {
-        std::cout << "Error while sending ECHO command\n";
+    std::string response = client.SendEcho(message);
+    if (response == "") {
+        std::cout << "No response from server with ECHO\n";
+        return;
     }
+
+    std::cout << response << "\n";
 }
 
 void time() {
     Client& client = Client::GetInstance();
 
-    if (!client.SendTime()) {
-        std::cout << "Error while sending TIME command\n";
+    std::time_t response = client.SendTime();
+    if (response == 0) {
+        std::cout << "No response from server with TIME\n";
+        return;
     }
+
+    std::cout << "Server time: " << std::ctime(&response);
 }
 
 void download(std::string fileName) {
