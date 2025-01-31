@@ -2,11 +2,13 @@
 #define _MESSAGE_H
 
 #include <cstdint>
+#include <chrono>
 
 namespace Msg {
     static constexpr uint16_t DEFAULT_SERVER_PORT = 5252;
 
     enum class Opcodes : uint8_t {
+        None,
         Echo,
         Time,
         Download,
@@ -30,6 +32,10 @@ namespace Response {
 
         Status status;
         uintmax_t totalSize;
+    };
+
+    struct Time {
+        std::time_t time;
     };
 };
 
