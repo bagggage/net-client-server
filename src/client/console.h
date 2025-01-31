@@ -26,7 +26,7 @@ public:
 class Console {
 public:
     template<typename T>
-    struct Context { T& Get() { static_assert(false && "User implementetion must be provided"); } };
+    struct Context { T& Get(); };
 
     class ArgIterator {
     private:
