@@ -20,7 +20,7 @@ static bool InitWSA() {
     WSADATA wsa_data;
 
     if ((int error = WSAStartup(MAKEWORD(2, 0), &wsaData)) != 0) [[unlikely]] {
-        Utils::Error("Failed to init Winsock: ", std::system_category().message(error));
+        Net::Error("Failed to init Winsock: ", std::system_category().message(error));
         return false;
     }
 
@@ -38,7 +38,7 @@ static bool TryInitWSA() {
 
 static void DeinitWSA() {
     if (WSACleanup() != 0) [[unlikely]] {
-        Utils::Error("Failed to cleanup Winsock: ", std::system_category().message(GetLastSystemError()));
+        Net::Error("Failed to cleanup Winsock: ", std::system_category().message(GetLastSystemError()));
         return;
     }
 
@@ -137,7 +137,7 @@ Address Address::FromString(const char* addressStr, const port_t port, Family fa
     }
 
     if (ret != 1) {
-        Utils::Error("Invalid address format");
+        Net::Error("Invalid address format");
         result.osAddress._validFlag = INVALID_FLAG;
     } else {
         result.osAddress.any.sa_family = static_cast<int>(family);
@@ -165,7 +165,7 @@ Address Address::FromDomain(const char* domainStr, const port_t port, const Prot
     ADDRINFO* addresses = nullptr;
     int ret = getaddrinfo(domainStr, nullptr, &hints, &addresses);
     if (ret != 0) {
-        Utils::Warn("Failed to get address info: ", gai_strerror(ret));
+        Net::Warn("Failed to get address info: ", gai_strerror(ret));
         return result;
     }
 
@@ -259,7 +259,7 @@ bool Socket::Open(const Address::Family addr_family, const Protocol protocol) {
     osSocket = socket(static_cast<int>(addr_family), sock_type, sock_prot);
     if (osSocket == INVALID_SOCKET) [[unlikely]] {
         status = static_cast<Status>(GetLastSystemError());
-        Utils::Error("Failed to open socket: ", std::system_category().message(static_cast<int>(status)));
+        Net::Error("Failed to open socket: ", std::system_category().message(static_cast<int>(status)));
         return false;
     }
 
@@ -274,7 +274,7 @@ void Socket::Close() {
     state = State::None;
     if (OS(closesocket, close)(osSocket) != 0) [[unlikely]] {
         status = static_cast<Status>(GetLastSystemError());
-        Utils::Error("Failed to close socket: ", std::system_category().message(static_cast<int>(status)));
+        Net::Error("Failed to close socket: ", std::system_category().message(static_cast<int>(status)));
     }
 
     osSocket = INVALID_SOCKET;
@@ -288,7 +288,7 @@ bool Socket::Connect(const Address& address) {
 
     if (connect(osSocket, &address.osAddress.any, sizeof(address)) < 0) {
         status = static_cast<Status>(GetLastSystemError());
-        Utils::Error("Failed to connect: ", std::system_category().message(static_cast<int>(status)));
+        Net::Error("Failed to connect: ", std::system_category().message(static_cast<int>(status)));
         return false;
     }
 
@@ -304,12 +304,12 @@ Address::port_t Socket::Listen(const Address& address) {
 
     if (bind(osSocket, &address.osAddress.any, sizeof(address.osAddress.any)) < 0) {
         status = static_cast<Status>(GetLastSystemError());
-        Utils::Error("Failed to bind address to socket: ", std::system_category().message(static_cast<int>(status)));
+        Net::Error("Failed to bind address to socket: ", std::system_category().message(static_cast<int>(status)));
         return Address::INVALID_PORT;
     }
     if (listen(osSocket, 0) < 0) {
         status = static_cast<Status>(GetLastSystemError());
-        Utils::Error("Failed to start listening: ", std::system_category().message(static_cast<int>(status)));
+        Net::Error("Failed to start listening: ", std::system_category().message(static_cast<int>(status)));
         return Address::INVALID_PORT;
     }
 

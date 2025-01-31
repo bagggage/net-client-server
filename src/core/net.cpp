@@ -18,9 +18,7 @@
 #include <cstring>
 #endif
 
-using namespace Net;
-
-std::string NetUtils::GetMacAddress() {
+std::string Net::GetMacAddress() {
     std::ostringstream macAddressStream;
     
 #ifdef _WIN32

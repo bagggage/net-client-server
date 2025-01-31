@@ -4,10 +4,7 @@
 #include <string>
 
 namespace Net {
-    class NetUtils {
-    public:
-        static std::string GetMacAddress();
-    };
+    static std::string GetMacAddress();
 }
 
 #endif 

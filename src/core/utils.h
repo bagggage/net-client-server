@@ -17,30 +17,27 @@
 #endif
 
 namespace Net {
-    class Utils {
-    public:
-        template<typename... Args>
-        static inline void Error(const Args&... args) {
-            if constexpr (!(LIBPOG_LOGS)) {
-                return;
-            }
-
-            std::cerr << LIBPOG_PREFIX " [Error]: ";
-            ((std::cerr << args), ...);
-            std::cerr << std::endl;
+    template<typename... Args>
+    static inline void Error(const Args&... args) {
+        if constexpr (!(LIBPOG_LOGS)) {
+            return;
         }
 
-        template<typename... Args>
-        static inline void Warn(const Args&... args) {
-            if constexpr (!(LIBPOG_LOGS)) {
-                return;
-            }
+        std::cerr << LIBPOG_PREFIX " [Error]: ";
+        ((std::cerr << args), ...);
+        std::cerr << std::endl;
+    }
 
-            std::cerr << LIBPOG_PREFIX " [Warning]: ";
-            ((std::cerr << args), ...);
-            std::cerr << std::endl;
+    template<typename... Args>
+    static inline void Warn(const Args&... args) {
+        if constexpr (!(LIBPOG_LOGS)) {
+            return;
         }
-    };
+
+        std::cerr << LIBPOG_PREFIX " [Warning]: ";
+        ((std::cerr << args), ...);
+        std::cerr << std::endl;
+    }
 }; // namespace Net
 
 #endif
