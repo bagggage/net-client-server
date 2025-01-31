@@ -9,6 +9,7 @@ namespace Msg {
         Time,
         Download,
         Upload,
+        Close,
 
         MAX
     };
