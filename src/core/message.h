@@ -4,6 +4,8 @@
 #include <cstdint>
 
 namespace Msg {
+    static constexpr uint16_t DEFAULT_SERVER_PORT = 5252;
+
     enum class Opcodes : uint8_t {
         Echo,
         Time,
@@ -12,6 +14,23 @@ namespace Msg {
 
         MAX
     };
+
+namespace Request {
+    struct Download { char fileName[256]; };
+};
+
+namespace Responce {
+    struct Download {
+        enum Status {
+            Ready,
+            NoSuchFile,
+        };
+
+        Status status;
+        uintptr_t totalSize;
+    };
+};
+
 };
 
 #endif

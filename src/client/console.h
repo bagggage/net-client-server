@@ -26,7 +26,7 @@ public:
 class Console {
 public:
     template<typename T>
-    struct Context { T& Get() { static_assert(false && "User implementetion must be provided"); } };
+    struct Context { T& Get(); };
 
     class ArgIterator {
     private:
@@ -34,9 +34,10 @@ public:
 
         std::string_view bufferView;
 
-        ArgIterator() = default;
         ArgIterator(std::string_view sv) : bufferView(sv) {}
     public:
+        ArgIterator() = default;
+
         std::string_view Next();
     };
 
