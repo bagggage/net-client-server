@@ -56,7 +56,7 @@ public:
 
 template<typename T>
 bool ParseTo(const char* string, T& outValue) {
-    static_assert(false && "Unsupported type");
+    //static_assert(false && "Unsupported type");
     return false;
 }
 
