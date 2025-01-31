@@ -41,7 +41,7 @@ bool Client::SendEcho(const std::string& message) {
     const auto* packet = builder.Append(message).Complete();
 
     if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) {
-        std::cerr << "Failed to send echo." << std::endl;
+        std::cerr << "Failed to send echo command." << std::endl;
         return false;
     }
 
@@ -53,7 +53,7 @@ bool Client::SendTime() {
     const auto* packet = builder.Complete();
 
     if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) {
-        std::cerr << "Failed to send time." << std::endl;
+        std::cerr << "Failed to send time command." << std::endl;
         return false;
     }
 
@@ -65,7 +65,7 @@ bool Client::SendDownload(const std::string& fileName) {
     const auto* packet = builder.Append(fileName).Complete();
 
     if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) {
-        std::cerr << "Failed to send download." << std::endl;
+        std::cerr << "Failed to send download command." << std::endl;
         return false;
     }
 
@@ -77,7 +77,19 @@ bool Client::SendUpload(const std::string& fileName) {
     const auto* packet = builder.Append(fileName).Complete();
 
     if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) {
-        std::cerr << "Failed to send upload." << std::endl;
+        std::cerr << "Failed to send upload command." << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+bool Client::SendClose() {
+    auto builder = Msg::Packet::Build(Msg::Opcodes::Close);
+    const auto* packet = builder.Complete();
+
+    if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) {
+        std::cerr << "Failed to send close command." << std::endl;
         return false;
     }
 

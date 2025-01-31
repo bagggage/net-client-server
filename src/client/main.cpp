@@ -5,25 +5,6 @@
 #include "client.h"
 
 #include <iostream>
-#include <string_view>
-#include <cmath>
-
-struct Config {
-    Net::Address::port_t serverPort = DEFAULT_SERVER_PORT;
-    const char* serverIp = nullptr;
-
-    bool Validate() const {
-        if (serverIp == nullptr) {
-            std::cerr << "Specify the server IP address, use \"-ip\"\n";
-            return false;
-        } else if (serverPort == 0) {
-            std::cerr << "Speficy valid server port, use \"-p\"\n";
-            return false;
-        }
-
-        return true;
-    }
-};
 
 static void PrintHelp() {
     std::cout <<
@@ -78,6 +59,20 @@ void upload(std::string fileName) {
     }
 }
 
+void close() {
+    Client& client = Client::GetInstance();
+
+    if (!client.SendClose()) {
+        std::cout << "Error while sending COMMAND command\n";
+    }
+}
+
+void disconnect() {
+    Client& client = Client::GetInstance();
+
+    client.Close();
+}
+
 int main(int argc, const char** argv) {
     // // Client
     // auto builder = Msg::Packet::Build(Msg::Opcodes::Echo);
@@ -105,6 +100,8 @@ int main(int argc, const char** argv) {
     commandSet.RegisterCommand("TIME", "Returns current time from server", time);
     commandSet.RegisterCommand("DOWNLOAD", "Downloading file <name> from srver", download);
     commandSet.RegisterCommand("UPLOAD", "Uploading file <name> to server", upload);
+    commandSet.RegisterCommand("DISCONNECT", "Closing the client connection", disconnect);
+    commandSet.RegisterCommand("CLOSE", "Sending close command to server", close);
 
     StdIoConsoleStream stream;
     Console console(stream, commandSet);

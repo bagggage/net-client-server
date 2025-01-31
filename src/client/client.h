@@ -20,6 +20,7 @@ public:
     bool SendTime();
     bool SendDownload(const std::string& fileName);
     bool SendUpload(const std::string& fileName);
+    bool SendClose();
 
 private:
     Net::Address serverAddress;
