@@ -34,9 +34,10 @@ public:
 
         std::string_view bufferView;
 
-        ArgIterator() = default;
         ArgIterator(std::string_view sv) : bufferView(sv) {}
     public:
+        ArgIterator() = default;
+
         std::string_view Next();
     };
 
