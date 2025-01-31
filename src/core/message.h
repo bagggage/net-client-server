@@ -25,10 +25,11 @@ namespace Response {
         enum Status {
             Ready,
             NoSuchFile,
+            IsNotFile,
         };
 
         Status status;
-        uintptr_t totalSize;
+        uintmax_t totalSize;
     };
 };
 
