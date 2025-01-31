@@ -1,8 +1,8 @@
 #include "net.h"
 
 #include <iostream>
-#include <vector>
 #include <sstream>
+#include <iomanip>
 
 #ifdef _WIN32
 #include <Winsock2.h>
@@ -18,9 +18,20 @@
 #include <cstring>
 #endif
 
-std::string Net::GetMacAddress() {
-    std::ostringstream macAddressStream;
-    
+using namespace Net;
+
+std::string MacAddress::ToString() const {
+    std::ostringstream macStream;
+    for (size_t i = 0; i < bytes.size(); i++) {
+        if (i != 0) macStream << ":";
+        macStream << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(bytes[i]);
+    }
+    return macStream.str();
+}
+
+MacAddress Net::GetMacAddress() {
+    MacAddress mac;
+
 #ifdef _WIN32
     IP_ADAPTER_INFO AdapterInfo[16];
     DWORD dwBufLen = sizeof(AdapterInfo);
@@ -30,11 +41,10 @@ std::string Net::GetMacAddress() {
 
         while (pAdapterInfo) {
             if (pAdapterInfo->Type == MIB_IF_TYPE_ETHERNET) { 
-                for (UINT i = 0; i < pAdapterInfo->AddressLength; i++) {
-                    if (i != 0) macAddressStream << ":";
-                    macAddressStream << std::hex << std::uppercase << (int)pAdapterInfo->Address[i];
-                }
-                break; // Возьмем первый Ethernet-адаптер
+                std::copy(pAdapterInfo->Address, 
+                          pAdapterInfo->Address + mac.bytes.size(), 
+                          mac.bytes.begin());
+                break; // Берем первый Ethernet-адаптер
             }
             pAdapterInfo = pAdapterInfo->Next;
         }
@@ -46,13 +56,13 @@ std::string Net::GetMacAddress() {
     char buf[1024];
     int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
     
-    if (sock == -1) return "";
+    if (sock == -1) return mac;
 
     ifc.ifc_len = sizeof(buf);
     ifc.ifc_buf = buf;
     if (ioctl(sock, SIOCGIFCONF, &ifc) == -1) {
         close(sock);
-        return "";
+        return mac;
     }
 
     struct ifreq* it = ifc.ifc_req;
@@ -63,11 +73,9 @@ std::string Net::GetMacAddress() {
         if (ioctl(sock, SIOCGIFFLAGS, &ifr) == 0) {
             if (!(ifr.ifr_flags & IFF_LOOPBACK)) {
                 if (ioctl(sock, SIOCGIFHWADDR, &ifr) == 0) {
-                    unsigned char* mac = (unsigned char*)ifr.ifr_hwaddr.sa_data;
-                    for (int i = 0; i < 6; i++) {
-                        if (i != 0) macAddressStream << ":";
-                        macAddressStream << std::hex << std::uppercase << (int)mac[i];
-                    }
+                    std::copy(reinterpret_cast<uint8_t*>(ifr.ifr_hwaddr.sa_data),
+                              reinterpret_cast<uint8_t*>(ifr.ifr_hwaddr.sa_data) + mac.bytes.size(),
+                              mac.bytes.begin());
                     break;
                 }
             }
@@ -76,5 +84,5 @@ std::string Net::GetMacAddress() {
     close(sock);
 #endif
 
-    return macAddressStream.str();
+    return mac;
 }

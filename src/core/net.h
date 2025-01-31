@@ -2,9 +2,16 @@
 #define _NET_H
 
 #include <string>
+#include <array>
 
 namespace Net {
-    static std::string GetMacAddress();
+    struct MacAddress {
+        std::array<uint8_t, 6> bytes = {0};
+
+        std::string ToString() const;
+    };
+
+    MacAddress GetMacAddress();
 }
 
 #endif 
