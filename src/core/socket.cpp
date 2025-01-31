@@ -60,7 +60,7 @@ inline static int GetLastSystemError() {
 }
 #endif
 
-const char* GetStatusName(const Status status) {
+const char* Net::GetStatusName(const Status status) {
     switch (status) {
         case Status::Success:
             return "Success";
@@ -88,7 +88,7 @@ const char* GetStatusName(const Status status) {
     return "Unknown";
 }
 
-const char* GetProtocolName(const Protocol protocol) {
+const char* Net::GetProtocolName(const Protocol protocol) {
     switch (protocol) {
         case Protocol::None:
             return "None";

@@ -1,8 +1,9 @@
 #ifndef _NET_H
 #define _NET_H
 
-#include <string>
 #include <array>
+#include <cstdint>
+#include <string>
 
 namespace Net {
     struct MacAddress {

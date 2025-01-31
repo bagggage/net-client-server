@@ -72,7 +72,7 @@ namespace Msg {
         inline T* GetDataAs() { return reinterpret_cast<T*>(&data[0]); }
 
         template<typename T>
-        inline const T* GetDataAs() const { return reinterpret_cast<T*>(&data[0]); }
+        inline const T* GetDataAs() const { return reinterpret_cast<const T*>(&data[0]); }
 
         inline bool Is(const Opcodes opcode) const { return header.opcode == opcode; }
 
