@@ -349,10 +349,10 @@ Socket Socket::Accept() {
     return result;
 }
 
-uint Socket::Send(const char* data, const uint size) {
+uint Socket::Send(const char* data, const uint size, const int flags) {
     LIBPOG_ASSERT(IsConnected(), "Socket must be connected");
 
-    ssize_t ret = send(osSocket, data, size, 0);
+    ssize_t ret = send(osSocket, data, size, flags);
     if (ret < 0) [[unlikely]] {
         status = static_cast<Status>(GetLastSystemError());
         return 0;
@@ -361,10 +361,10 @@ uint Socket::Send(const char* data, const uint size) {
     return static_cast<uint>(ret);
 }
 
-uint Socket::Receive(char* buffer, const uint size) {
+uint Socket::Receive(char* buffer, const uint size, const int flags) {
     LIBPOG_ASSERT(IsConnected(), "Socket must be connected");
 
-    const ssize_t ret = recv(osSocket, buffer, size, 0);
+    const ssize_t ret = recv(osSocket, buffer, size, flags);
     if (ret < 0) [[unlikely]] {
         status = static_cast<Status>(GetLastSystemError());
         return 0;

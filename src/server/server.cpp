@@ -8,6 +8,7 @@
 
 Server::Server(const Net::Address::port_t port) {
     tcpListenSock.Open(Net::Address::Family::IPv4, Net::Protocol::TCP);
+    tcpListenSock.SetOption(Net::Socket::Option::ReuseAddress, true);
     tcpListenSock.Listen(Net::Address::MakeBind(port, Net::Protocol::TCP, Net::Address::Family::IPv4));
 };
 
@@ -90,16 +91,16 @@ bool Server::HandlePacket(ClientHandle& client, const Msg::Packet* packet) {
 }
 
 bool Server::HandleDownload(ClientHandle& client, const char* fileName) {
-    const auto filePath = hostDirectory.append(fileName);
+    const auto filePath = hostDirectory / fileName;
 
     std::ifstream fileStream;
 
-    auto builder = Msg::Packet::Build(Msg::Opcodes::Download);
     Msg::Response::Download response;
 
     if (std::filesystem::exists(filePath)) {
         if (std::filesystem::is_regular_file(filePath) == false) {
             response.status = Msg::Response::Download::IsNotFile;
+            std::cout << "Is not file: " << filePath << '\n';
             goto sendPacket;
         }
 
@@ -110,15 +111,16 @@ bool Server::HandleDownload(ClientHandle& client, const char* fileName) {
 
         if (fileStream.is_open() == false) [[unlikely]] {
             response.status = Msg::Response::Download::NoSuchFile;
+            std::cout << "Failed to open file: " << filePath << '\n';
         }
     } else {
         response.status = Msg::Response::Download::NoSuchFile;
+        std::cout << "No such file: " << filePath << '\n';
     }
 
 sendPacket:
     {
-        const Msg::Packet* packet = builder.Complete();
-        client.tcpSock.Send(packet->RawPtr(), packet->GetSize());
+        client.tcpSock.Send(response);
 
         if (CheckFail(client)) [[unlikely]] return false;
         if (response.status != Msg::Response::Download::Ready) return true;
@@ -130,8 +132,10 @@ sendPacket:
         const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToSend);
         fileStream.read(client.buffer, chunkSize);
 
-        client.tcpSock.Send(client.buffer, chunkSize);
+        const uint sended = client.tcpSock.Send(client.buffer, chunkSize, bytesToSend > chunkSize ? MSG_MORE : 0);
         if (CheckFail(client)) [[unlikely]] return false;
+
+        bytesToSend -= chunkSize;
     }
 
     return true;

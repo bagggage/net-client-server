@@ -92,7 +92,7 @@ bool Client::SendDownload(const std::string& fileName) {
         return false;
     }
 
-    uint num = clientSock.Receive(buffer.data(), sizeof(Msg::Packet) + sizeof(Msg::Response::Download));
+    uint num = clientSock.Receive(buffer.data(), sizeof(Msg::Response::Download));
 
     if (num == 0) {
         std::cerr << "Failed to get response data." << std::endl;
@@ -110,7 +110,7 @@ bool Client::SendDownload(const std::string& fileName) {
 
     size_t bytesToReceive = response->totalSize;
     while (bytesToReceive > 0) {
-        const size_t chunkSize = std::min(buffer.size(), std::max(bytesToReceive, 128ul));
+        const size_t chunkSize = std::min(buffer.size(), bytesToReceive);
 
         uint received = clientSock.Receive(buffer.data(), chunkSize);
         if (clientSock.Fail()) return false;

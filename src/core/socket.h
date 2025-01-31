@@ -147,6 +147,7 @@ namespace Net {
             AcceptConnections = SO_ACCEPTCONN,
             KeepAlive = SO_KEEPALIVE,
             Broadcast = SO_BROADCAST,
+            ReuseAddress = SO_REUSEADDR,
         };
 
     private:
@@ -194,11 +195,11 @@ namespace Net {
 
         /// Sends the data to remote side. On success return the number of bytes sent.
         /// Otherwise returns `0`, use `Socket::Fail()` to determine what happend.
-        uint Send(const char* dataPtr, const uint size);
+        uint Send(const char* dataPtr, const uint size, const int flags = 0);
         /// Receives data from remote side.
         /// Returns number of received bytes. `0` represents an error or no-data,
         /// use `Socket::Fail()` to determine what happend.
-        uint Receive(char* bufferPtr, const uint size);
+        uint Receive(char* bufferPtr, const uint size, const int flags = 0);
 
         uint SendTo(const Address& address, const char* dataPtr, const uint size);
         uint ReceiveFrom(char* bufferPtr, const uint size, Address& outRemoteAddress);
