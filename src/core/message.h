@@ -20,7 +20,7 @@ namespace Request {
     struct Download { char fileName[256]; };
 };
 
-namespace Responce {
+namespace Response {
     struct Download {
         enum Status {
             Ready,
