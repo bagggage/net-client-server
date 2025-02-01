@@ -4,144 +4,136 @@
 
 #include <fstream>
 
-Client& Client::GetInstance() {
-    static Client instance;
-    return instance;
+const char* Client::GetLoadResultName(const LoadResult result) {
+    switch (result) {
+        case Success: return "success";
+        case NetworkError: return "network error";
+        case NoSuchFile: return "no such file";
+        case NotRegularFile: return "not a regular file";
+        default: return "unknown";
+    }
 }
 
-Client::Client() {}
-
-Client::~Client() {}
-
-bool Client::Connect(const std::string& address, unsigned short port) {
-    serverAddress = Net::Address::FromString(address.c_str(), port);
-    std::cout << "Server address: " << serverAddress.ConvertToString() << std::endl;
+bool Client::Connect(const std::string& ipAddress, unsigned short port) {
+    const Net::Address serverAddress = Net::Address::FromString(ipAddress.c_str(), port);
 
     clientSock.Open(Net::Address::Family::IPv4, Net::Protocol::TCP);
-    bool result = clientSock.Connect(serverAddress);
+    if (!clientSock.IsOpen()) [[unlikely]] return false;
 
-    if (!clientSock.IsConnected()) {
-        std::cerr << "Socket is not connected. Exit." << std::endl;
-        return false;
-    }
+    clientSock.Connect(serverAddress);
+    if (!clientSock.IsConnected()) return false;
 
     const Net::MacAddress macAddress = Net::GetMacAddress();
-
     if (!clientSock.Send(reinterpret_cast<const char*>(macAddress.bytes.data()), macAddress.bytes.size())) {
-        std::cerr << "Failed to send MAC address." << std::endl;
         return false;
     }
 
-    std::cout << "Client connected." << std::endl;
     return true;
 }
 
-void Client::Close() {
-    clientSock.Close();
-    LIBPOG_ASSERT(!clientSock.IsConnected(), "Socket must be disconnected");
-    LIBPOG_ASSERT(!clientSock.IsOpen(), "Socket must be closed");
-    std::cout << "Connection closed. Goodbye!" << std::endl;
-}
-
-std::string Client::SendEcho(const std::string& message) {
+std::string_view Client::Echo(const std::string_view message) {
     auto builder = Msg::Packet::Build(Msg::Opcodes::Echo);
-    const auto* packet = builder.Append(message.data(), message.size() + 1).Complete();
+    const auto* packet = builder.Append(message.begin(), message.size() + 1).Complete();
 
-    if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) {
-        std::cerr << "Failed to send echo command." << std::endl;
-        return "";
-    }
+    if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) [[unlikely]] return {};
+    if (!clientSock.Receive(buffer.data(), message.size() + 1, Net::Socket::WaitAll)) [[unlikely]] return {};
 
-    buffer.fill(0);
-    uint num = clientSock.Receive(buffer.data(), buffer.size());
-    
-    if (num > 0) {
-        return std::string(buffer.data(), num);
-    } else {
-        std::cerr << "Failed to receive echoed data." << std::endl;
-        return "";
-    }
+    return std::string_view(buffer.data(), message.size());
 }
 
-std::time_t Client::SendTime() {
+std::time_t Client::Time() {
     auto builder = Msg::Packet::Build(Msg::Opcodes::Time);
     const auto* packet = builder.Complete();
 
-    if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) {
-        std::cerr << "Failed to send time command." << std::endl;
-        return 0; 
-    }
+    if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) [[unlikely]] return 0;
+    if (!clientSock.Receive(buffer.data(), sizeof(std::time_t), Net::Socket::WaitAll)) [[unlikely]] return 0;
 
-    buffer.fill(0);
-    uint num = clientSock.Receive(buffer.data(), buffer.size());
-
-    if (num == sizeof(std::time_t)) {
-        return *reinterpret_cast<const std::time_t*>(buffer.data());
-    } else {
-        std::cerr << "Failed to receive time data." << std::endl;
-        return 0; 
-    }
+    return *reinterpret_cast<const std::time_t*>(buffer.data());
 }
 
-bool Client::SendDownload(const std::string& fileName) {
+Client::LoadResult Client::Download(const std::string_view fileName) {
+    const std::filesystem::path filePath = downloadPath / fileName;
+    std::ofstream fileStream(filePath, std::ios::binary);
+    if (!fileStream.is_open()) [[unlikely]] return InvalidSavePath;
+
+    LoadResult result = NetworkError;
+
     auto builder = Msg::Packet::Build(Msg::Opcodes::Download);
-    const auto* packet = builder.Append(fileName.data(), fileName.size() + 1).Complete();
+    const auto* packet = builder.Append(fileName.data(), fileName.size()).Append((char)0).Complete();
 
-    if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) {
-        std::cerr << "Failed to send download command." << std::endl;
-        return false;
+    if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) [[unlikely]] goto ret;
+    if (!clientSock.Receive(buffer.data(), sizeof(Msg::Response::Download), Net::Socket::WaitAll)) [[unlikely]] goto ret;
+
+    {
+        const Msg::Response::Download* response = reinterpret_cast<Msg::Response::Download*>(buffer.data());
+        if (response->status != Msg::Response::Download::Ready) {
+            result = (response->status == Msg::Response::Download::NoSuchFile) ? NoSuchFile : NotRegularFile;
+            goto ret;
+        }
+
+        // Send file by chunks.
+        {
+            size_t bytesToReceive = response->totalSize;
+            while (bytesToReceive > 0) {
+                const size_t chunkSize = std::min(buffer.size(), bytesToReceive);
+
+                uint received = clientSock.Receive(buffer.data(), chunkSize);
+                if (received == 0) goto ret;
+
+                fileStream.write(buffer.data(), received);
+                bytesToReceive -= received;
+            }
+        }
     }
 
-    uint num = clientSock.Receive(buffer.data(), sizeof(Msg::Response::Download));
-
-    if (num == 0) {
-        std::cerr << "Failed to get response data." << std::endl;
-        return false;
+ret:
+    if (result != Success) {
+        fileStream.close();
+        std::filesystem::remove(filePath);
     }
 
-    const Msg::Response::Download* response = reinterpret_cast<Msg::Response::Download*>(buffer.data());
-
-    if (response->status != Msg::Response::Download::Ready) {
-        std::cerr << "Failed to receive file data." << std::endl;
-        return false;
-    }
-
-    std::ofstream fileStream(fileName, std::ios::binary);
-
-    size_t bytesToReceive = response->totalSize;
-    while (bytesToReceive > 0) {
-        const size_t chunkSize = std::min(buffer.size(), bytesToReceive);
-
-        uint received = clientSock.Receive(buffer.data(), chunkSize);
-        if (clientSock.Fail()) return false;
-
-        fileStream.write(buffer.data(), received);
-        bytesToReceive -= received;
-    }
-
-    return true;
+    return result;
 }
 
-bool Client::SendUpload(const std::string& fileName) {
+Client::LoadResult Client::Upload(const std::string_view filePathStr) {
+    const std::filesystem::path filePath = filePathStr;
+
+    std::ifstream fileStream(filePath, std::ios::binary);
+    if (!fileStream.is_open()) [[unlikely]] return NoSuchFile;
+
+    Msg::Request::Upload request;
+    request.fileSize = std::filesystem::file_size(filePath);
+
     auto builder = Msg::Packet::Build(Msg::Opcodes::Upload);
-    const auto* packet = builder.Append(fileName).Complete();
+    const auto* packet = builder
+        .Append(request)
+        .Append(filePath.filename().c_str())
+        .Complete();
 
-    if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) {
-        std::cerr << "Failed to send upload command." << std::endl;
-        return false;
+    if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) [[unlikely]] return NetworkError;
+
+    size_t bytesToSend = request.fileSize;
+    while (bytesToSend > 0) {
+        const size_t chunkSize = std::min(buffer.size(), bytesToSend);
+        fileStream.read(buffer.data(), chunkSize);
+
+        uint sended = clientSock.Send(
+            buffer.data(), chunkSize,
+            (bytesToSend > chunkSize) ?
+                Net::Socket::MoreDataToSend :
+                Net::Socket::None
+        );
+        if (sended != chunkSize) [[unlikely]] return NetworkError;
+
+        bytesToSend -= chunkSize;
     }
 
-    return true;
+    return Success;
 }
 
-bool Client::SendClose() {
+bool Client::Close() {
     auto builder = Msg::Packet::Build(Msg::Opcodes::Close);
     const auto* packet = builder.Complete();
 
-    if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) {
-        std::cerr << "Failed to send close command." << std::endl;
-        return false;
-    }
-
-    return true;
+    return clientSock.Send(packet->RawPtr(), packet->GetSize()) == packet->GetSize();
 }

@@ -1,42 +1,48 @@
 #ifndef _CLIENT_H
 #define _CLIENT_H
 
-#include "utils.h"
-#include "socket.h"
-
-#include <iostream>
-#include <string>
 #include <array>
 #include <ctime>
+#include <filesystem>
+#include <string>
+#include <iostream>
 
-#define DEFAULT_SERVER_ADDRESS "127.0.0.1"
-#define DEFAULT_BUFFER_SIZE 4096
+#define LIBPOG_LOGS false
+
+#include "socket.h"
 
 class Client {
 public:
-    static Client& GetInstance();
+    static constexpr unsigned int DEFAULT_BUFFER_SIZE = 4096;
+    static constexpr const char* DEFAULT_DOWNLOAD_DIRECTORY = "downloads";
 
-    bool Connect(const std::string& address, unsigned short port);
-    void Close();
+    enum LoadResult {
+        Success,
+        InvalidSavePath,
+        NoSuchFile,
+        NotRegularFile,
+        NetworkError,
+    };
 
-    std::string SendEcho(const std::string& message);
-    std::time_t SendTime();
-    bool SendDownload(const std::string& fileName);
-    bool SendUpload(const std::string& fileName);
-    bool SendClose();
+    static const char* GetLoadResultName(const LoadResult result);
 
 private:
-    Net::Address serverAddress;
     Net::Socket clientSock;
-    std::array<char, DEFAULT_BUFFER_SIZE> buffer{};
+    std::array<char, DEFAULT_BUFFER_SIZE> buffer;
 
-    Client();
-    ~Client();
+public:
+    std::filesystem::path downloadPath;
 
-    Client(const Client&) = delete;
-    Client& operator=(const Client&) = delete;
-    Client(Client&&) = delete;
-    Client& operator=(Client&&) = delete;
+    bool Connect(const std::string& ipAddress, unsigned short port);
+    void Disconnect();
+
+    std::string_view Echo(const std::string_view message);
+    std::time_t Time();
+    LoadResult Download(const std::string_view fileName);
+    LoadResult Upload(const std::string_view filePath);
+    bool Close();
+
+    inline Net::Status GetStatus() const { return clientSock.Fail(); }
 };
 
 #endif // _CLIENT_H
