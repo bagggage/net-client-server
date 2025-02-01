@@ -27,6 +27,7 @@ int Server::Accept() {
         return INVALID_CLIENT_INDEX;
     }
 
+    std::cout << "Client [" << client.identifier.ToString() << "] connected.";
     return clientIndex;
 }
 
@@ -72,8 +73,7 @@ bool Server::HandlePacket(ClientHandle& client, const Msg::Packet* packet) {
 
     switch (packet->GetHeader().opcode) {
         case Msg::Opcodes::Echo: {
-            std::cout << "Echo\n";
-            client.tcpSock.Send(packet->RawPtr(), packet->GetSize());
+            client.tcpSock.Send(packet->GetDataAs<char>(), packet->GetDataSize());
         } break;
         case Msg::Opcodes::Time: {
             const std::time_t serverTime = std::time(nullptr);
@@ -94,7 +94,6 @@ bool Server::HandleDownload(ClientHandle& client, const char* fileName) {
     const auto filePath = hostDirectory / fileName;
 
     std::ifstream fileStream;
-
     Msg::Response::Download response;
 
     if (std::filesystem::exists(filePath)) {
@@ -132,7 +131,12 @@ sendPacket:
         const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToSend);
         fileStream.read(client.buffer, chunkSize);
 
-        const uint sended = client.tcpSock.Send(client.buffer, chunkSize, bytesToSend > chunkSize ? MSG_MORE : 0);
+        client.tcpSock.Send(
+            client.buffer, chunkSize,
+            (bytesToSend > chunkSize) ?
+                Net::Socket::MoreDataToSend :
+                Net::Socket::None
+        );
         if (CheckFail(client)) [[unlikely]] return false;
 
         bytesToSend -= chunkSize;

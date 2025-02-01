@@ -92,16 +92,13 @@ int main(int argc, const char** argv) {
     while (true) {
         const int clientIndex = server.Accept();
 
-        std::cout << "After accept\n";
-
         if (clientIndex == Server::INVALID_CLIENT_INDEX) continue;
 
         while (true) {
             if (server.Handle(clientIndex) == false) [[unlikely]] break;
         }
 
-        std::cout << "Client disconnected?\n";
-        break;
+        std::cout << "Client disconnected.\n";
     }
 
     return EXIT_SUCCESS;

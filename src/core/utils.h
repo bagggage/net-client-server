@@ -3,7 +3,7 @@
 
 #include <iostream>
 
-#ifndef LIBPOG_RELEASE
+#ifdef LIBPOG_DEBUG
 #define LIBPOG_LOGS true
 #define LIBPOG_PREFIX "libPOG"
 

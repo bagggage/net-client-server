@@ -20,6 +20,10 @@ namespace Msg {
 
 namespace Request {
     struct Download { char fileName[256]; };
+    struct Upload {
+        size_t fileSize;
+        char fileName[];
+    };
 };
 
 namespace Response {
