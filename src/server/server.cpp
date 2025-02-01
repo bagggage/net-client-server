@@ -27,7 +27,7 @@ int Server::Accept() {
         return INVALID_CLIENT_INDEX;
     }
 
-    std::cout << "Client [" << client.identifier.ToString() << "] connected.";
+    std::cout << "Client [" << client.identifier.ToString() << "] connected.\n";
     return clientIndex;
 }
 
@@ -50,7 +50,7 @@ bool Server::CheckFail(ClientHandle& client) {
     Net::Status status = client.tcpSock.Fail();
     if (status == Net::Status::Success) return false;
 
-    std::cerr << "client[" << client.identifier.ToString() << "]: " << Net::GetStatusName(status) << '\n';
+    std::cerr << "client[" << client.identifier.ToString() << "]: " << Net::GetStatusName(status) << ".\n";
 
     switch (status) {
         case Net::Status::Timeout:
@@ -69,7 +69,7 @@ bool Server::CheckFail(ClientHandle& client) {
 }
 
 bool Server::HandlePacket(ClientHandle& client, const Msg::Packet* packet) {
-    std::cout << "Handle packet: type: " << (int)packet->GetHeader().opcode << " - size: " << packet->GetSize() << '\n';
+    std::cout << "Handle packet: type: " << (int)packet->GetHeader().opcode << " - size: " << packet->GetSize() << ".\n";
 
     switch (packet->GetHeader().opcode) {
         case Msg::Opcodes::Echo: {
@@ -81,7 +81,8 @@ bool Server::HandlePacket(ClientHandle& client, const Msg::Packet* packet) {
         } break;
         case Msg::Opcodes::Download:
             return HandleDownload(client, packet->GetDataAs<Msg::Request::Download>()->fileName);
-            break;
+        case Msg::Opcodes::Upload:
+            return HandleUpload(client, packet->GetDataAs<Msg::Request::Upload>());
         default:
             std::cerr << "Invalid packet from client[" << client.identifier.ToString() << "].\n";
             return false;
@@ -99,7 +100,7 @@ bool Server::HandleDownload(ClientHandle& client, const char* fileName) {
     if (std::filesystem::exists(filePath)) {
         if (std::filesystem::is_regular_file(filePath) == false) {
             response.status = Msg::Response::Download::IsNotFile;
-            std::cout << "Is not file: " << filePath << '\n';
+            std::cout << "Is not file: " << filePath << ".\n";
             goto sendPacket;
         }
 
@@ -110,11 +111,11 @@ bool Server::HandleDownload(ClientHandle& client, const char* fileName) {
 
         if (fileStream.is_open() == false) [[unlikely]] {
             response.status = Msg::Response::Download::NoSuchFile;
-            std::cout << "Failed to open file: " << filePath << '\n';
+            std::cout << "Failed to open file: " << filePath << ".\n";
         }
     } else {
         response.status = Msg::Response::Download::NoSuchFile;
-        std::cout << "No such file: " << filePath << '\n';
+        std::cout << "No such file: " << filePath << ".\n";
     }
 
 sendPacket:
@@ -142,5 +143,49 @@ sendPacket:
         bytesToSend -= chunkSize;
     }
 
+    return true;
+}
+
+bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* request) {
+    size_t bytesToReceive = request->fileSize;
+
+    if (request->fileSize == 0) return false;
+    if (request->fileName[0] == '.' || request->fileName[0] == '/' || request->fileName[0] == '~') {
+        // Ignore file content: invalid file name
+    ignoreContent:
+        while (bytesToReceive > 0) {
+            const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToReceive);
+
+            uint received = client.tcpSock.Receive(client.buffer, chunkSize, Net::Socket::WaitAll);
+            if (CheckFail(client)) [[unlikely]] return false;
+
+            bytesToReceive -= received;
+        }
+        return false;
+    }
+
+    const std::filesystem::path filePath = hostDirectory / request->fileName;
+    std::ofstream fileStream(filePath, std::ios::binary);
+
+    if (fileStream.is_open() == false) [[unlikely]] {
+        std::cout << "Failed to create or open file at " << filePath << ".\n";
+        goto ignoreContent;
+    }
+
+    while (bytesToReceive > 0) {
+        const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToReceive);
+
+        uint received = client.tcpSock.Receive(client.buffer, chunkSize);
+        if (CheckFail(client)) [[unlikely]] {
+            fileStream.close();
+            std::filesystem::remove(filePath);
+            return false;
+        }
+
+        fileStream.write(client.buffer, received);
+        bytesToReceive -= received;
+    }
+
+    std::cout << "File saved at " << filePath << ".\n";
     return true;
 }

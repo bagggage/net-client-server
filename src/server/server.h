@@ -33,6 +33,7 @@ private:
     bool CheckFail(ClientHandle& client);
     bool HandlePacket(ClientHandle& client, const Msg::Packet* packet);
     bool HandleDownload(ClientHandle& client, const char* fileName);
+    bool HandleUpload(ClientHandle& client, const Msg::Request::Upload* request);
 
 public:
     Server(const Net::Address::port_t port);

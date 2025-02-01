@@ -84,6 +84,8 @@ Client::LoadResult Client::Download(const std::string_view fileName) {
                 bytesToReceive -= received;
             }
         }
+
+        result = Success;
     }
 
 ret:
