@@ -349,7 +349,7 @@ Socket Socket::Accept() {
     return result;
 }
 
-uint Socket::Send(const char* data, const uint size, const int flags) {
+uint Socket::Send(const char* data, const uint size, const Flags flags) {
     LIBPOG_ASSERT(IsConnected(), "Socket must be connected");
 
     ssize_t ret = send(osSocket, data, size, flags);
@@ -361,7 +361,7 @@ uint Socket::Send(const char* data, const uint size, const int flags) {
     return static_cast<uint>(ret);
 }
 
-uint Socket::Receive(char* buffer, const uint size, const int flags) {
+uint Socket::Receive(char* buffer, const uint size, const Flags flags) {
     LIBPOG_ASSERT(IsConnected(), "Socket must be connected");
 
     const ssize_t ret = recv(osSocket, buffer, size, flags);
@@ -373,7 +373,7 @@ uint Socket::Receive(char* buffer, const uint size, const int flags) {
     return static_cast<uint>(ret);
 }
 
-uint Socket::SendTo(const Address& address, const char* dataPtr, const uint size) {
+uint Socket::SendTo(const Address& address, const char* dataPtr, const uint size, const Flags flags) {
     LIBPOG_ASSERT(IsOpen(), "Socket must be open");
 
     const ssize_t ret = sendto(osSocket, dataPtr, size, 0, &address.osAddress.any, sizeof(address.osAddress.any));
@@ -385,7 +385,7 @@ uint Socket::SendTo(const Address& address, const char* dataPtr, const uint size
     return static_cast<uint>(ret);
 }
 
-uint Socket::ReceiveFrom(char* bufferPtr, const uint size, Address& outRemoteAddress) {
+uint Socket::ReceiveFrom(char* bufferPtr, const uint size, Address& outRemoteAddress, const Flags flags) {
     LIBPOG_ASSERT(IsOpen(), "Socket must be open");
 
     socklen_t sockSize = sizeof(outRemoteAddress.osAddress.any);
@@ -398,7 +398,7 @@ uint Socket::ReceiveFrom(char* bufferPtr, const uint size, Address& outRemoteAdd
     return static_cast<uint>(ret);
 }
 
-uint Socket::ReceiveFrom(char* bufferPtr, const uint size, Socket& outSocket) {
+uint Socket::ReceiveFrom(char* bufferPtr, const uint size, Socket& outSocket, const Flags flags) {
     LIBPOG_ASSERT(outSocket.IsOpen() == false, "Output socket must be closed");
 
     Address remoteAddress;

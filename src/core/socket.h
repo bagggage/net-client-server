@@ -149,6 +149,19 @@ namespace Net {
             Broadcast = SO_BROADCAST,
             ReuseAddress = SO_REUSEADDR,
         };
+        enum Flags {
+            None = 0,
+            Batch = MSG_BATCH,
+            Confirm = MSG_CONFIRM,
+            DontRoute = MSG_DONTROUTE,
+            DontWait = MSG_DONTWAIT,
+            Finalize = MSG_FIN,
+            MoreDataToSend = MSG_MORE,
+            Peek = MSG_PEEK,
+            Reset = MSG_RST,
+            Synchronize = MSG_SYN,
+            WaitAll = MSG_WAITALL,
+        };
 
     private:
 #ifndef _WIN32
@@ -195,15 +208,15 @@ namespace Net {
 
         /// Sends the data to remote side. On success return the number of bytes sent.
         /// Otherwise returns `0`, use `Socket::Fail()` to determine what happend.
-        uint Send(const char* dataPtr, const uint size, const int flags = 0);
+        uint Send(const char* dataPtr, const uint size, const Flags flags = None);
         /// Receives data from remote side.
         /// Returns number of received bytes. `0` represents an error or no-data,
         /// use `Socket::Fail()` to determine what happend.
-        uint Receive(char* bufferPtr, const uint size, const int flags = 0);
+        uint Receive(char* bufferPtr, const uint size, const Flags flags = None);
 
-        uint SendTo(const Address& address, const char* dataPtr, const uint size);
-        uint ReceiveFrom(char* bufferPtr, const uint size, Address& outRemoteAddress);
-        uint ReceiveFrom(char* bufferPtr, const uint size, Socket& outSocket);
+        uint SendTo(const Address& address, const char* dataPtr, const uint size, const Flags flags = None);
+        uint ReceiveFrom(char* bufferPtr, const uint size, Address& outRemoteAddressm, const Flags flags = None);
+        uint ReceiveFrom(char* bufferPtr, const uint size, Socket& outSocket, const Flags flags = None);
 
         /// Same as `Send(const char*, const uint size)`, but works with typed objects.
         template<typename T>
