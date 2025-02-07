@@ -24,7 +24,7 @@ const char* Client::GetLoadResultName(const LoadResult result) {
 }
 
 bool Client::Connect(const std::string& ipAddress, unsigned short port) {
-    const Net::Address serverAddress = Net::Address::FromString(ipAddress.c_str(), port);
+    const Net::Address serverAddress = Net::Address::FromDomain(ipAddress.c_str(), port);
 
     clientSock.Open(Net::Address::Family::IPv4, Net::Protocol::TCP);
     if (!clientSock.IsOpen()) [[unlikely]] return false;
