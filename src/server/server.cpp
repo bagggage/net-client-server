@@ -6,6 +6,15 @@
 #include <fstream>
 #include <filesystem>
 
+static void takeBitrate(const std::chrono::system_clock::time_point begin, const uint bytes) {
+    const auto end = std::chrono::system_clock::now();
+
+    const size_t timeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+    const float bitrate = ((double)bytes / 125000) / ((double)timeNs / 1e+9);
+
+    std::cout << "Bitrate: " << bitrate << " Mb/s.\n";
+}
+
 Server::Server(const Net::Address::port_t port) {
     tcpListenSock.Open(Net::Address::Family::IPv4, Net::Protocol::TCP);
     tcpListenSock.SetOption(Net::Socket::Option::ReuseAddress, true);
@@ -126,6 +135,8 @@ sendPacket:
         if (response.status != Msg::Response::Download::Ready) return true;
     }
 
+    const auto beginTime = std::chrono::system_clock::now();
+
     // Send file.
     size_t bytesToSend = response.totalSize;
     while (bytesToSend > 0) {
@@ -143,10 +154,13 @@ sendPacket:
         bytesToSend -= chunkSize;
     }
 
+    takeBitrate(beginTime, response.totalSize);
+
     return true;
 }
 
 bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* request) {
+    const size_t fileSize = request->fileSize;
     size_t bytesToReceive = request->fileSize;
 
     if (request->fileSize == 0) return false;
@@ -172,6 +186,7 @@ bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* requ
         goto ignoreContent;
     }
 
+    const auto beginTime = std::chrono::system_clock::now();
     while (bytesToReceive > 0) {
         const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToReceive);
 
@@ -185,6 +200,8 @@ bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* requ
         fileStream.write(client.buffer, received);
         bytesToReceive -= received;
     }
+
+    takeBitrate(beginTime, fileSize);
 
     std::cout << "File saved at " << filePath << ".\n";
     return true;

@@ -4,6 +4,15 @@
 
 #include <fstream>
 
+static void takeBitrate(const std::chrono::system_clock::time_point begin, const uint bytes) {
+    const auto end = std::chrono::system_clock::now();
+
+    const size_t timeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+    const float bitrate = ((double)bytes / 125000) / ((double)timeNs / 1e+9);
+
+    std::cout << "Bitrate: " << bitrate << " Mb/s.\n";
+}
+
 const char* Client::GetLoadResultName(const LoadResult result) {
     switch (result) {
         case Success: return "success";
@@ -73,6 +82,9 @@ Client::LoadResult Client::Download(const std::string_view fileName) {
 
         // Send file by chunks.
         {
+            const size_t fileSize = response->totalSize;
+            const auto beginTime = std::chrono::system_clock::now();
+
             size_t bytesToReceive = response->totalSize;
             while (bytesToReceive > 0) {
                 const size_t chunkSize = std::min(buffer.size(), bytesToReceive);
@@ -83,6 +95,8 @@ Client::LoadResult Client::Download(const std::string_view fileName) {
                 fileStream.write(buffer.data(), received);
                 bytesToReceive -= received;
             }
+
+            takeBitrate(beginTime, fileSize);
         }
 
         result = Success;
@@ -114,6 +128,8 @@ Client::LoadResult Client::Upload(const std::string_view filePathStr) {
 
     if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) [[unlikely]] return NetworkError;
 
+    const auto beginTime = std::chrono::system_clock::now();
+
     size_t bytesToSend = request.fileSize;
     while (bytesToSend > 0) {
         const size_t chunkSize = std::min(buffer.size(), bytesToSend);
@@ -129,6 +145,8 @@ Client::LoadResult Client::Upload(const std::string_view filePathStr) {
 
         bytesToSend -= chunkSize;
     }
+
+    takeBitrate(beginTime, request.fileSize);
 
     return Success;
 }
