@@ -50,6 +50,10 @@ namespace Msg {
                 return Append(string, std::strlen(string) + 1);
             }
 
+            inline BuildProxy& Append(const std::string_view string) {
+                return Append(string.data(), string.length()).Append((char)0);
+            }
+
             inline const Packet* Complete() {
                 Packet* packet = reinterpret_cast<Packet*>(buffer.data());
                 packet->header.dataSize = buffer.size() - sizeof(Header);
