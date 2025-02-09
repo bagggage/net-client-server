@@ -190,6 +190,13 @@ namespace Net {
 
         ~Socket() noexcept { Close(); }
 
+        friend void swap(Socket& a, Socket& b) {
+            using std::swap;
+            swap(a.state,    b.state);
+            swap(a.status,   b.status);
+            swap(a.osSocket, b.osSocket);
+        }
+
         bool Open(const Address::Family addrFamily, const Protocol protocol);
         void Close();
 
@@ -232,7 +239,7 @@ namespace Net {
         /// Same as `Receive(char*, const uint size)` but works with typed objects.
         template<typename T>
         uint Receive(T* destObject) {
-            return Receive(reinterpret_cast<char*>(destObject), sizeof(T));
+            return Receive(reinterpret_cast<char*>(destObject), sizeof(T), Flags::WaitAll);
         }
         /// Same as `Receive(char*, const uint size)` but works with typed objects.
         template<typename T>

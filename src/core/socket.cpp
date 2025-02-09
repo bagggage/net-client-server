@@ -68,6 +68,8 @@ const char* Net::GetStatusName(const Status status) {
             return "Failed";
         case Status::ConnectionRefused:
             return "Connection Refused";
+        case Status::ConnectionReset:
+            return "Connection Reset";
         case Status::AlreadyConnected:
             return "Already Connected";
         case Status::AlreadyInProgress:
