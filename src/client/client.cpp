@@ -4,7 +4,7 @@
 
 #include <fstream>
 
-static void takeBitrate(const std::chrono::system_clock::time_point begin, const uint bytes) {
+static void TakeBitrate(const std::chrono::system_clock::time_point begin, const uint bytes) {
     const auto end = std::chrono::system_clock::now();
 
     const size_t timeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
@@ -23,8 +23,24 @@ const char* Client::GetLoadResultName(const LoadResult result) {
     }
 }
 
-bool Client::Connect(const std::string& ipAddress, unsigned short port) {
-    const Net::Address serverAddress = Net::Address::FromDomain(ipAddress.c_str(), port);
+Client::LoadResult Client::HandleDownloadRecovery(std::string& outFileName) {
+    Msg::Packet packet {};
+    clientSock.Receive(packet);
+    if (clientSock.GetStatus() != Net::Status::Success) [[unlikely]] return NetworkError;
+
+    if (!packet.Is(Msg::Opcodes::DownloadRecovery)) return NoSuchFile;
+
+    clientSock.Receive(buffer.data(), packet.GetDataSize(), Net::Socket::WaitAll);
+    if (clientSock.GetStatus() != Net::Status::Success) [[unlikely]] return NetworkError;
+
+    const auto response = reinterpret_cast<Msg::Response::DownloadRecovery*>(buffer.data());
+    outFileName = response->fileName;
+
+    return Success;
+}
+
+bool Client::Connect(const std::string& address, unsigned short port) {
+    const Net::Address serverAddress = Net::Address::FromDomain(address.c_str(), port);
 
     clientSock.Open(Net::Address::Family::IPv4, Net::Protocol::TCP);
     if (!clientSock.IsOpen()) [[unlikely]] return false;
@@ -33,7 +49,8 @@ bool Client::Connect(const std::string& ipAddress, unsigned short port) {
     if (!clientSock.IsConnected()) return false;
 
     const Net::MacAddress macAddress = Net::GetMacAddress();
-    if (!clientSock.Send(reinterpret_cast<const char*>(macAddress.bytes.data()), macAddress.bytes.size())) {
+    if (!clientSock.Send(reinterpret_cast<const char*>(macAddress.bytes.data()), macAddress.bytes.size())) [[unlikely]] {
+        clientSock.Close();
         return false;
     }
 
@@ -60,15 +77,17 @@ std::time_t Client::Time() {
     return *reinterpret_cast<const std::time_t*>(buffer.data());
 }
 
-Client::LoadResult Client::Download(const std::string_view fileName) {
+Client::LoadResult Client::Download(const std::string_view fileName, const size_t startPos) {
     const std::filesystem::path filePath = downloadPath / fileName;
     std::ofstream fileStream(filePath, std::ios::binary);
     if (!fileStream.is_open()) [[unlikely]] return InvalidSavePath;
 
     LoadResult result = NetworkError;
 
+    const Msg::Request::Download request = { startPos };
+
     auto builder = Msg::Packet::Build(Msg::Opcodes::Download);
-    const auto* packet = builder.Append(fileName.data(), fileName.size()).Append((char)0).Complete();
+    const auto* packet = builder.Append(request).Append(fileName).Complete();
 
     if (!clientSock.Send(packet->RawPtr(), packet->GetSize())) [[unlikely]] goto ret;
     if (!clientSock.Receive(buffer.data(), sizeof(Msg::Response::Download), Net::Socket::WaitAll)) [[unlikely]] goto ret;
@@ -96,7 +115,7 @@ Client::LoadResult Client::Download(const std::string_view fileName) {
                 bytesToReceive -= received;
             }
 
-            takeBitrate(beginTime, fileSize);
+            TakeBitrate(beginTime, fileSize);
         }
 
         result = Success;
@@ -146,7 +165,7 @@ Client::LoadResult Client::Upload(const std::string_view filePathStr) {
         bytesToSend -= chunkSize;
     }
 
-    takeBitrate(beginTime, request.fileSize);
+    TakeBitrate(beginTime, request.fileSize);
 
     return Success;
 }

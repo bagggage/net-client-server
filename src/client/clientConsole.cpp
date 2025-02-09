@@ -19,6 +19,17 @@ const CommandSet& ClientConsole::GetCommandSet() {
     return commandSet;
 }
 
+void ClientConsole::Download(const std::string_view fileName, const size_t startPos) {
+    if (Client::LoadResult result = client.Download(fileName, startPos)) {
+        std::cerr << "Download failed: " <<
+            ((result == Client::NetworkError) ? Net::GetStatusName(client.GetStatus()) : Client::GetLoadResultName(result))
+            << ".\n";
+        return;
+    }
+
+    std::cout << "File saved at " << client.downloadPath << ".\n";
+}
+
 void ClientConsole::CloseCmd() {
     if (!client.Close()) {
         std::cerr << "Close failed: " << Net::GetStatusName(client.GetStatus()) << ".\n";
@@ -32,6 +43,33 @@ void ClientConsole::ConnectCmd(std::string ipAddress, unsigned short port) {
     }
 
     std::cout << "Connected succefully.\n";
+
+    // Recovery invalid download.
+    std::string fileName;
+    const Client::LoadResult result = client.HandleDownloadRecovery(fileName);
+
+    if (result == Client::NoSuchFile) return;
+    if (result == Client::NetworkError) [[unlikely]] {
+        std::cerr << "Failed: " << Client::GetLoadResultName(result) << ".\n";
+        return;
+    }
+
+    // Ask to continue.
+    {
+        std::cout << "The download of file \'" << fileName << "\' was not completed, do you want to continue? [y/n]:\n";
+
+        std::string answer;
+        do {
+            std::getline(std::cin, answer);
+        } while (answer.empty());
+
+        if (answer.size() != 1 || answer[0] != 'y' || answer[0] != 'Y') return;
+    }
+
+    const std::filesystem::path filePath = client.downloadPath / fileName;
+    const size_t downloadedSize = std::filesystem::exists(filePath) ? std::filesystem::file_size(filePath) : 0;
+
+    Download(fileName, downloadedSize);
 }
 
 void ClientConsole::EchoCmd(std::string_view message) {
@@ -55,14 +93,7 @@ void ClientConsole::TimeCmd() {
 }
 
 void ClientConsole::DownloadCmd(std::string_view fileName) {
-    if (Client::LoadResult result = client.Download(fileName)) {
-        std::cerr << "Download failed: " <<
-            ((result == Client::NetworkError) ? Net::GetStatusName(client.GetStatus()) : Client::GetLoadResultName(result))
-            << ".\n";
-        return;
-    }
-
-    std::cout << "File saved at " << client.downloadPath << ".\n";
+    Download(fileName, 0);
 }
 
 void ClientConsole::UploadCmd(std::string_view fileName) {

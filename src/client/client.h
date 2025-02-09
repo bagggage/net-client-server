@@ -33,13 +33,14 @@ private:
 public:
     std::filesystem::path downloadPath;
 
-    bool Connect(const std::string& ipAddress, unsigned short port);
+    bool Connect(const std::string& address, unsigned short port);
     void Disconnect();
 
     std::string_view Echo(const std::string_view message);
     std::time_t Time();
-    LoadResult Download(const std::string_view fileName);
+    LoadResult Download(const std::string_view fileName, const size_t startPos);
     LoadResult Upload(const std::string_view filePath);
+    LoadResult HandleDownloadRecovery(std::string& outFileName);
     bool Close();
 
     inline Net::Status GetStatus() const { return clientSock.Fail(); }

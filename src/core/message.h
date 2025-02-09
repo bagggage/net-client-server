@@ -15,11 +15,16 @@ namespace Msg {
         Upload,
         Close,
 
+        DownloadRecovery,
+
         MAX
     };
 
 namespace Request {
-    struct Download { char fileName[256]; };
+    struct Download {
+        size_t position;
+        char fileName[];
+    };
     struct Upload {
         size_t fileSize;
         char fileName[];
@@ -27,6 +32,11 @@ namespace Request {
 };
 
 namespace Response {
+    struct DownloadRecovery {
+        size_t position;
+        char fileName[];
+    };
+
     struct Download {
         enum Status {
             Ready,
@@ -35,7 +45,7 @@ namespace Response {
         };
 
         Status status;
-        uintmax_t totalSize;
+        size_t totalSize;
     };
 
     struct Time {

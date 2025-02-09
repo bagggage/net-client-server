@@ -7,6 +7,7 @@
 
 #include <vector>
 #include <filesystem>
+#include <unordered_map>
 
 class Server {
 public:
@@ -15,7 +16,8 @@ public:
 
     static constexpr const char* DEFAULT_FILES_DIR = "./hosted-files";
 private:
-    struct ClientHandle {
+    class ClientHandle {
+    public:
         Net::Socket tcpSock;
         Net::MacAddress identifier;
         char* buffer = nullptr;
@@ -23,16 +25,40 @@ private:
         ClientHandle(Net::Socket&& socket) : tcpSock(std::move(socket)) {
             buffer = new char[DEFAULT_BUFFER_SIZE];
         }
+        ClientHandle(ClientHandle&& other) : tcpSock(std::move(other.tcpSock)) {
+            buffer = other.buffer;
+            identifier = other.identifier;
+
+            other.buffer = nullptr;
+        }
+
+        ~ClientHandle() { delete[] buffer; }
+
+        friend void swap(ClientHandle& a, ClientHandle& b) {
+            using std::swap;
+            swap(a.buffer,     b.buffer);
+            swap(a.identifier, b.identifier);
+        }
+
+        bool operator==(const ClientHandle& other) const {
+            return this == &other;
+        }
+    };
+
+    struct DownloadStamp {
+        std::filesystem::path filePath;
+        size_t position;
     };
 
     Net::Socket tcpListenSock;
     std::vector<ClientHandle> clients;
+    std::unordered_map<Net::MacAddress, DownloadStamp> recoveryStamps;
 
     std::filesystem::path hostDirectory;
 
     bool CheckFail(ClientHandle& client);
     bool HandlePacket(ClientHandle& client, const Msg::Packet* packet);
-    bool HandleDownload(ClientHandle& client, const char* fileName);
+    bool HandleDownload(ClientHandle& client, const size_t startPos, const char* fileName);
     bool HandleUpload(ClientHandle& client, const Msg::Request::Upload* request);
 
 public:

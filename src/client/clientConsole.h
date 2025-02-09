@@ -13,6 +13,8 @@ private:
 
     static const CommandSet& GetCommandSet();
 
+    static void Download(const std::string_view fileName, const size_t startPos);
+
     static void CloseCmd();
     static void ConnectCmd(std::string ipAddress, unsigned short port);
     static void DisconnectCmd();
