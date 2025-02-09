@@ -89,6 +89,13 @@ int main(int argc, const char** argv) {
     Server server(config.port);
     server.SetHostDirectory(config.hostFilesDirectory);
 
+    if (Net::Status fail = server.Fail()) [[unlikely]] {
+        std::cerr << "Failed to startup server: " << Net::GetStatusName(fail) << ".\n";
+        return EXIT_FAILURE;
+    }
+
+    std::cout << "Server listening at port: " << config.port << ".\n";
+
     while (true) {
         const int clientIndex = server.Accept();
         if (clientIndex == Server::INVALID_CLIENT_INDEX) continue;
