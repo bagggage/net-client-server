@@ -49,7 +49,9 @@ bool Client::Connect(const std::string& address, unsigned short port) {
     if (!clientSock.IsConnected()) return false;
 
     const Net::MacAddress macAddress = Net::GetMacAddress();
-    if (!clientSock.Send(reinterpret_cast<const char*>(macAddress.bytes.data()), macAddress.bytes.size())) [[unlikely]] {
+    clientSock.Send(macAddress); 
+
+    if (clientSock.GetStatus() != Net::Status::Success) [[unlikely]] {
         clientSock.Close();
         return false;
     }

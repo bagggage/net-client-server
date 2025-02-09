@@ -44,6 +44,7 @@ int Server::Accept() {
                 .Complete();
 
             client.tcpSock.Send(packet->RawPtr(), packet->GetSize());
+            recoveryStamps.erase(downloadStamp);
         } else {
             recoveryStamps.clear();
 

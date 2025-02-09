@@ -36,8 +36,8 @@ void ClientConsole::CloseCmd() {
     }
 }
 
-void ClientConsole::ConnectCmd(std::string ipAddress, unsigned short port) {
-    if (!client.Connect(ipAddress, port)) {
+void ClientConsole::ConnectCmd(std::string hostAddress, unsigned short port) {
+    if (!client.Connect(hostAddress, port)) {
         std::cerr << "Connection failed: " << Net::GetStatusName(client.GetStatus()) << ".\n";
         return;
     }
@@ -63,7 +63,7 @@ void ClientConsole::ConnectCmd(std::string ipAddress, unsigned short port) {
             std::getline(std::cin, answer);
         } while (answer.empty());
 
-        if (answer.size() != 1 || answer[0] != 'y' || answer[0] != 'Y') return;
+        if (answer.size() != 1 || (answer[0] != 'y' && answer[0] != 'Y')) return;
     }
 
     const std::filesystem::path filePath = client.downloadPath / fileName;
