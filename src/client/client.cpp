@@ -101,9 +101,11 @@ Client::LoadResult Client::Download(const std::string_view fileName, const size_
             goto ret;
         }
 
-        // Send file by chunks.
+        // Receive file by chunks.
         {
-            const size_t fileSize = response->totalSize;
+            if (startPos != 0) fileStream.seekp(startPos);
+
+            const size_t dataSize = response->totalSize;
             const auto beginTime = std::chrono::system_clock::now();
 
             size_t bytesToReceive = response->totalSize;
@@ -117,7 +119,7 @@ Client::LoadResult Client::Download(const std::string_view fileName, const size_
                 bytesToReceive -= received;
             }
 
-            TakeBitrate(beginTime, fileSize);
+            TakeBitrate(beginTime, dataSize);
         }
 
         result = Success;

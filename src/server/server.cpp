@@ -169,11 +169,12 @@ sendPacket:
     }
 
     if (response.totalSize == 0) [[unlikely]] return true;
+    if (startPos != 0) fileStream.seekg(startPos, std::ios::beg);
 
     const auto beginTime = std::chrono::system_clock::now();
 
     // Send file.
-    size_t bytesToSend = response.totalSize - startPos;
+    size_t bytesToSend = response.totalSize;
     while (bytesToSend > 0) {
         const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToSend);
         fileStream.read(client.buffer, chunkSize);
