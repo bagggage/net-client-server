@@ -79,9 +79,12 @@ std::time_t Client::Time() {
     return *reinterpret_cast<const std::time_t*>(buffer.data());
 }
 
-Client::LoadResult Client::Download(const std::string_view fileName, const size_t startPos) {
+Client::LoadResult Client::Download(const std::string_view fileName, const size_t startPos) {    
     const std::filesystem::path filePath = downloadPath / fileName;
-    std::ofstream fileStream(filePath, std::ios::binary);
+    std::ofstream fileStream(
+        filePath,
+        std::ios_base::binary | ((startPos > 0) ? std::ios_base::app : std::ios_base::out)
+    );
     if (!fileStream.is_open()) [[unlikely]] return InvalidSavePath;
 
     LoadResult result = NetworkError;
