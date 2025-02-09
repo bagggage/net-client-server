@@ -161,6 +161,7 @@ namespace Net {
             Reset = MSG_RST,
             Synchronize = MSG_SYN,
             WaitAll = MSG_WAITALL,
+            NoSignal = MSG_NOSIGNAL
         };
 
     private:

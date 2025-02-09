@@ -179,9 +179,11 @@ sendPacket:
 
         client.tcpSock.Send(
             client.buffer, chunkSize,
-            (bytesToSend > chunkSize) ?
+            static_cast<Net::Socket::Flags>(
+                ((bytesToSend > chunkSize) ?
                 Net::Socket::MoreDataToSend :
-                Net::Socket::None
+                Net::Socket::None) | Net::Socket::NoSignal
+            )
         );
         if (CheckFail(client)) {
             recoveryStamps[client.identifier] = DownloadStamp{ filePath, startPos + response.totalSize - bytesToSend };
