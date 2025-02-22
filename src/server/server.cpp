@@ -53,7 +53,9 @@ int Server::Accept() {
                 .Append(downloadStamp->second.filePath.filename().c_str())
                 .Complete();
 
-            client.transport->Send(packet->RawPtr(), packet->GetSize());
+            client.transport->Send(packet->RawPtr(), sizeof(Msg::Packet::Header));
+            client.transport->Send(packet->GetDataAs<char>(), packet->GetDataSize());
+
             recoveryStamps.erase(downloadStamp);
         } else {
             recoveryStamps.clear();
