@@ -97,6 +97,7 @@ bool Server::CheckFail(ClientHandle& client) {
 
     switch (status) {
         case Net::Status::Timeout:
+        case Net::Status::TryAgain:
         case Net::Status::Unreachable:
         case Net::Status::ConnectionRefused:
         case Net::Status::ConnectionReset: {
