@@ -24,6 +24,9 @@ namespace Net {
         virtual uint Send(const void* data, const uint32_t size) = 0;
         virtual uint Receive(void* buffer, const uint32_t size) = 0;
 
+        virtual void SetupTimeout() = 0;
+        virtual void DropTimeout() = 0;
+
         template<typename T>
         uint Send(const T& object) {
             return Send(reinterpret_cast<const void*>(&object), sizeof(T));
@@ -56,6 +59,9 @@ namespace Net {
 
         Status GetStatus() override { return socket.GetStatus(); }
         Status Fail() override { return socket.Fail(); }
+
+        void SetupTimeout() override {}
+        void DropTimeout() override {}
     };
 
     class UdpTransport final : public Transport {
@@ -87,6 +93,9 @@ namespace Net {
 
         Status GetStatus() override { return socket.GetStatus(); }
         Status Fail() override { return socket.Fail(); }
+
+        void SetupTimeout() override;
+        void DropTimeout() override;
     };
 }
 

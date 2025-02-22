@@ -183,6 +183,8 @@ sendPacket:
     if (startPos != 0) fileStream.seekg(startPos, std::ios::beg);
 
     const auto beginTime = std::chrono::system_clock::now();
+    
+    client.transport->SetupTimeout();
 
     // Send file.
     size_t bytesToSend = response.totalSize;
@@ -195,6 +197,7 @@ sendPacket:
 
         if (CheckFail(client)) {
             recoveryStamps[client.identifier] = DownloadStamp{ filePath, startPos + response.totalSize - bytesToSend };
+            client.transport->DropTimeout();
             return false;
         }
 
@@ -202,6 +205,7 @@ sendPacket:
     }
 
     TakeBitrate(beginTime, response.totalSize);
+    client.transport->DropTimeout();
 
     return true;
 }
@@ -233,6 +237,8 @@ bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* requ
         goto ignoreContent;
     }
 
+    client.transport->SetupTimeout();
+
     const auto beginTime = std::chrono::system_clock::now();
     while (bytesToReceive > 0) {
         const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToReceive);
@@ -243,6 +249,7 @@ bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* requ
         if (CheckFail(client)) [[unlikely]] {
             fileStream.close();
             std::filesystem::remove(filePath);
+            client.transport->DropTimeout();
             return false;
         }
 
@@ -251,6 +258,7 @@ bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* requ
     }
 
     TakeBitrate(beginTime, fileSize);
+    client.transport->DropTimeout();
 
     std::cout << "File saved at " << filePath << ".\n";
     return true;

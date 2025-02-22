@@ -25,7 +25,6 @@ Ptr<Transport> TcpTransport::Listen(const Net::Address& address) {
 
 bool TcpTransport::Connect(const Net::Address& address) {
     if (socket.IsOpen()) socket.Close();
-
     if (!socket.Open(Address::Family::IPv4, Protocol::TCP)) return false;
 
     return socket.Connect(address);
@@ -42,6 +41,8 @@ uint TcpTransport::Send(const void* data, const uint32_t size) {
 uint TcpTransport::Receive(void* buffer, const uint32_t size) {
     return socket.Receive(reinterpret_cast<char*>(buffer), size, Net::Socket::WaitAll);
 }
+
+static constexpr uint UDP_TIMEOUT = 5;
 
 Ptr<Transport> UdpTransport::Listen(const Net::Address& address) {
     if (!socket.IsOpen()) {
@@ -77,7 +78,7 @@ bool UdpTransport::Connect(const Net::Address& address) {
     if (socket.IsOpen()) socket.Close();
 
     if (!socket.Open(Address::Family::IPv4, Protocol::UDP)) return false;
-    if (!socket.SetOption<timeval>(Socket::Option::ReceiveTimeout, { 4, 0 })) return false;
+    if (!socket.SetOption<timeval>(Socket::Option::ReceiveTimeout, { UDP_TIMEOUT, 0 })) return false;
 
     socket.SendTo(address, CONNECT_MAGIC, sizeof(CONNECT_MAGIC));
 
@@ -133,4 +134,18 @@ uint UdpTransport::Receive(void* buffer, const uint32_t size) {
     uint32_t sendSize = (size + (SIZE_ALIGN - 1)) & -SIZE_ALIGN;
     if (RawReceive(buffer, sendSize, Net::Socket::WaitAll) != sendSize) return 0;
     return size;
+}
+
+void UdpTransport::SetupTimeout() {
+    if (receiveSocket)
+        receiveSocket->SetOption<timeval>(Socket::Option::ReceiveTimeout, { UDP_TIMEOUT, 0 });
+    else
+        socket.SetOption<timeval>(Socket::Option::ReceiveTimeout, { UDP_TIMEOUT, 0 });
+}
+
+void UdpTransport::DropTimeout() {
+    if (receiveSocket)
+        receiveSocket->SetOption<timeval>(Socket::Option::ReceiveTimeout, { 120, 0 });
+    else
+        socket.SetOption<timeval>(Socket::Option::ReceiveTimeout, { 120, 0 });
 }
