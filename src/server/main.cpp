@@ -8,6 +8,7 @@
 
 struct ServerConfig {
     Net::Address::port_t port = Msg::DEFAULT_SERVER_PORT;
+    Net::Protocol protocol = Net::Protocol::TCP;
     const char* hostFilesDirectory = Server::DEFAULT_FILES_DIR;
 };
 
@@ -18,6 +19,7 @@ static void PrintHelp() {
         "  -p\n"
         "  -dir <path>\tSpecify directory to host.\n"
         "  -d\n"
+        "  -udp\tStart server over UDP protocol.\n"
         "  -help\tShow this help.\n"
         "  -h\n";
     ;
@@ -48,6 +50,8 @@ static bool ParseServerArgs(int argc, const char** argv, ServerConfig& outConfig
                     "Expected host directory: -dir, d <directory path>.",
                     outConfig.hostFilesDirectory
                 );
+            } if (value == "udp") {
+                outConfig.protocol = Net::Protocol::UDP;
             } else if (value == "help" || value == "h") {
                 printHelp = true;
             } else {
@@ -86,7 +90,7 @@ int main(int argc, const char** argv) {
         return EXIT_FAILURE;
     }
 
-    Server server(config.port);
+    Server server(config.protocol, config.port);
     server.SetHostDirectory(config.hostFilesDirectory);
 
     if (Net::Status fail = server.Fail()) [[unlikely]] {
@@ -98,7 +102,10 @@ int main(int argc, const char** argv) {
 
     while (true) {
         const int clientIndex = server.Accept();
-        if (clientIndex == Server::INVALID_CLIENT_INDEX) continue;
+        if (clientIndex == Server::INVALID_CLIENT_INDEX) {
+            std::cout << "Accept failed: " << Net::GetStatusName(server.Fail()) << ".\n";
+            continue;
+        }
 
         while (server.Handle(clientIndex) != false);
 

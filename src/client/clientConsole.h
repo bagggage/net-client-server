@@ -16,7 +16,7 @@ private:
     static void Download(const std::string_view fileName, const size_t startPos);
 
     static void CloseCmd();
-    static void ConnectCmd(std::string hostAddress, unsigned short port);
+    static void ConnectCmd(const std::string_view protocolStr, std::string hostAddress, unsigned short port);
     static void DisconnectCmd();
     static void DownloadCmd(std::string_view fileName);
     static void EchoCmd(std::string_view message);

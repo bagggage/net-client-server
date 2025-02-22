@@ -188,7 +188,7 @@ Address Address::MakeBind(const port_t port, const Protocol protocol, const Fami
         return result;
     }
 
-    result.osAddress.any.sa_family = static_cast<int>(family);
+    result.osAddress.any.sa_family = static_cast<short>(family);
 
     switch (family) {
         case Family::IPv4: {
@@ -298,17 +298,22 @@ bool Socket::Connect(const Address& address) {
     return true;
 }
 
+bool Socket::Bind(const Address& address) {
+    if (bind(osSocket, &address.osAddress.any, sizeof(address.osAddress.any)) < 0) {
+        status = static_cast<Status>(GetLastSystemError());
+        Net::Error("Failed to bind address to socket: ", std::system_category().message(static_cast<int>(status)));
+        return false;
+    }
+    return true;
+}
+
 Address::port_t Socket::Listen(const Address& address) {
     LIBPOG_ASSERT(
         (IsOpen() && state == State::None),
         "Socket can start listening from opened state only, if it's not alredy connected or listening"
     );
 
-    if (bind(osSocket, &address.osAddress.any, sizeof(address.osAddress.any)) < 0) {
-        status = static_cast<Status>(GetLastSystemError());
-        Net::Error("Failed to bind address to socket: ", std::system_category().message(static_cast<int>(status)));
-        return Address::INVALID_PORT;
-    }
+    if (Bind(address) == false) return Address::INVALID_PORT;
     if (listen(osSocket, 0) < 0) {
         status = static_cast<Status>(GetLastSystemError());
         Net::Error("Failed to start listening: ", std::system_category().message(static_cast<int>(status)));
@@ -378,7 +383,7 @@ uint Socket::Receive(char* buffer, const uint size, const Flags flags) {
 uint Socket::SendTo(const Address& address, const char* dataPtr, const uint size, const Flags flags) {
     LIBPOG_ASSERT(IsOpen(), "Socket must be open");
 
-    const ssize_t ret = sendto(osSocket, dataPtr, size, 0, &address.osAddress.any, sizeof(address.osAddress.any));
+    const ssize_t ret = sendto(osSocket, dataPtr, size, static_cast<int>(flags), &address.osAddress.any, sizeof(address.osAddress.ipv4));
     if (ret < 0) [[unlikely]] {
         status = static_cast<Status>(GetLastSystemError());
         return 0;
@@ -390,8 +395,8 @@ uint Socket::SendTo(const Address& address, const char* dataPtr, const uint size
 uint Socket::ReceiveFrom(char* bufferPtr, const uint size, Address& outRemoteAddress, const Flags flags) {
     LIBPOG_ASSERT(IsOpen(), "Socket must be open");
 
-    socklen_t sockSize = sizeof(outRemoteAddress.osAddress.any);
-    const ssize_t ret = recvfrom(osSocket, bufferPtr, size, 0, &outRemoteAddress.osAddress.any, &sockSize);
+    socklen_t sockSize = sizeof(outRemoteAddress.osAddress.ipv4);
+    const ssize_t ret = recvfrom(osSocket, bufferPtr, size, static_cast<int>(flags), &outRemoteAddress.osAddress.any, &sockSize);
     if (ret < 0) {
         status = static_cast<Status>(GetLastSystemError());
         return 0;
@@ -404,7 +409,7 @@ uint Socket::ReceiveFrom(char* bufferPtr, const uint size, Socket& outSocket, co
     LIBPOG_ASSERT(outSocket.IsOpen() == false, "Output socket must be closed");
 
     Address remoteAddress;
-    const uint ret = ReceiveFrom(bufferPtr, size, remoteAddress);
+    const uint ret = ReceiveFrom(bufferPtr, size, remoteAddress, flags);
     if (remoteAddress.IsValid() == false) [[unlikely]] {
         return ret;
     }
@@ -432,7 +437,7 @@ uint Socket::Send(const std::string& string) {
 }
 
 bool Socket::SetOption(const Option option, const void* value, const uint valueSize) {
-    if (setsockopt(osSocket, SOL_SOCKET, static_cast<int>(option), value, sizeof(value)) == SOCKET_ERROR) {
+    if (setsockopt(osSocket, SOL_SOCKET, static_cast<int>(option), value, valueSize) == SOCKET_ERROR) {
         status = static_cast<Status>(GetLastSystemError());
         return false;
     }

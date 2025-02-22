@@ -148,6 +148,8 @@ namespace Net {
             KeepAlive = SO_KEEPALIVE,
             Broadcast = SO_BROADCAST,
             ReuseAddress = SO_REUSEADDR,
+            ReceiveTimeout = SO_RCVTIMEO,
+            SendTimeout = SO_SNDTIMEO
         };
         enum Flags {
             None = 0,
@@ -203,6 +205,8 @@ namespace Net {
 
         // Client side.
         bool Connect(const Address& address);
+
+        bool Bind(const Address& address);
 
         /// Starts listening for incoming connections.
         /// - `address`: address to start listening at.

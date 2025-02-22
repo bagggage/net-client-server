@@ -1,31 +1,34 @@
 #ifndef _SERVER_H
 #define _SERVER_H
 
-#include "socket.h"
-#include "packet.h"
-#include "net.h"
-
 #include <vector>
 #include <filesystem>
 #include <unordered_map>
 
+#include "socket.h"
+#include "packet.h"
+#include "net.h"
+#include "transport.h"
+
 class Server {
 public:
     static constexpr int INVALID_CLIENT_INDEX = -1;
-    static constexpr size_t DEFAULT_BUFFER_SIZE = 4096;
+    static constexpr size_t DEFAULT_BUFFER_SIZE = 4096 * 2;
 
     static constexpr const char* DEFAULT_FILES_DIR = "./hosted-files";
 private:
     class ClientHandle {
     public:
-        Net::Socket tcpSock;
+        Net::Ptr<Net::Transport> transport;
         Net::MacAddress identifier;
         char* buffer = nullptr;
 
-        ClientHandle(Net::Socket&& socket) : tcpSock(std::move(socket)) {
+        ClientHandle(Net::Ptr<Net::Transport>&& transport) : transport(std::move(transport)) {
             buffer = new char[DEFAULT_BUFFER_SIZE];
         }
-        ClientHandle(ClientHandle&& other) : tcpSock(std::move(other.tcpSock)) {
+        ClientHandle(ClientHandle&& other) {
+            transport.reset(other.transport.release());
+
             buffer = other.buffer;
             identifier = other.identifier;
 
@@ -50,10 +53,11 @@ private:
         size_t position;
     };
 
-    Net::Socket tcpListenSock;
+    Net::Ptr<Net::Transport> listenTransport;
     std::vector<ClientHandle> clients;
     std::unordered_map<Net::MacAddress, DownloadStamp> recoveryStamps;
 
+    Net::Address::port_t port;
     std::filesystem::path hostDirectory;
 
     bool CheckFail(ClientHandle& client);
@@ -62,17 +66,15 @@ private:
     bool HandleUpload(ClientHandle& client, const Msg::Request::Upload* request);
 
 public:
-    Server(const Net::Address::port_t port);
+    Server(const Net::Protocol protocol, const Net::Address::port_t port);
 
     int Accept();
     bool Handle(unsigned int clientIndex);
 
     inline void SetHostDirectory(std::string_view path) { hostDirectory = path; }
 
-    inline bool IsListening() { return tcpListenSock.IsListening(); }
-    inline Net::Status Fail() { return tcpListenSock.Fail(); }
-
-    inline Net::Status ClientFail(unsigned int clientIndex) { return clients[clientIndex].tcpSock.Fail(); }
+    inline Net::Status Fail() { return listenTransport->Fail(); }
+    inline Net::Status ClientFail(unsigned int clientIndex) { return clients[clientIndex].transport->Fail(); }
 };
 
 #endif

@@ -36,8 +36,17 @@ void ClientConsole::CloseCmd() {
     }
 }
 
-void ClientConsole::ConnectCmd(std::string hostAddress, unsigned short port) {
-    if (!client.Connect(hostAddress, port)) {
+void ClientConsole::ConnectCmd(const std::string_view protocolStr, std::string hostAddress, unsigned short port) {
+    Net::Protocol protocol = (
+        protocolStr == "tcp" ? Net::Protocol::TCP :
+        (protocolStr == "udp" ? Net::Protocol::UDP : Net::Protocol::None)
+    );
+    if (protocol == Net::Protocol::None) {
+        std::cerr << "Invalid protocol: " << protocolStr << ".\nconnect <protocol> <ip> <port>\n";
+        return;
+    }
+
+    if (!client.Connect(protocol, hostAddress, port)) {
         std::cerr << "Connection failed: " << Net::GetStatusName(client.GetStatus()) << ".\n";
         return;
     }
