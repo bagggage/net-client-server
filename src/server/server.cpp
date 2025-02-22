@@ -194,9 +194,8 @@ sendPacket:
         fileStream.read(client.buffer, chunkSize);
 
         client.transport->Send(client.buffer, chunkSize);
-        client.transport->Receive(client.buffer, 1); // ACK
-
-        if (CheckFail(client)) {
+        // ACK
+        if (client.transport->Receive(client.buffer, 1) != 1 || CheckFail(client)) {
             recoveryStamps[client.identifier] = DownloadStamp{ filePath, startPos + response.totalSize - bytesToSend };
             client.transport->DropTimeout();
             return false;

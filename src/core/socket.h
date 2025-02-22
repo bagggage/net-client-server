@@ -35,6 +35,7 @@ namespace Net {
         Timeout = ETIMEDOUT,
         TryAgain = EAGAIN,
         Unreachable = ENETUNREACH,
+        WouldBlock = EWOULDBLOCK,
     };
     enum class Protocol : uint8_t {
         None = 0,

@@ -145,7 +145,7 @@ void UdpTransport::SetupTimeout() {
 
 void UdpTransport::DropTimeout() {
     if (receiveSocket)
-        receiveSocket->SetOption<timeval>(Socket::Option::ReceiveTimeout, { 120, 0 });
+        receiveSocket->SetOption<timeval>(Socket::Option::ReceiveTimeout, { 0, 0 });
     else
-        socket.SetOption<timeval>(Socket::Option::ReceiveTimeout, { 120, 0 });
+        socket.SetOption<timeval>(Socket::Option::ReceiveTimeout, { 0, 0 });
 }
