@@ -112,7 +112,7 @@ uint UdpTransport::Send(const void* data, const uint32_t size) {
 }
 
 uint UdpTransport::RawSend(const void* buffer, const uint32_t size, Net::Socket::Flags flags) {
-    std::cout << "send: " << size << ".\n";
+    //std::cout << "send: " << size << ".\n";
 
     if (receiveSocket == nullptr) {
         return socket.SendTo(remoteAddress, reinterpret_cast<const char*>(buffer), size, flags);
@@ -121,7 +121,7 @@ uint UdpTransport::RawSend(const void* buffer, const uint32_t size, Net::Socket:
 }
 
 uint UdpTransport::RawReceive(void* buffer, const uint32_t size, Net::Socket::Flags flags) {
-    std::cout << "receive: " << size << ".\n";
+    //std::cout << "receive: " << size << ".\n";
 
     if (receiveSocket == nullptr) {
         return socket.Receive(reinterpret_cast<char*>(buffer), size, flags);
