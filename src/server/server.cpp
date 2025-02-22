@@ -16,21 +16,31 @@ static void TakeBitrate(const std::chrono::system_clock::time_point begin, const
     std::cout << "Bitrate: " << bitrate << " Mb/s.\n";
 }
 
-Server::Server(const Net::Address::port_t port) {
-    tcpListenSock.Open(Net::Address::Family::IPv4, Net::Protocol::TCP);
-    tcpListenSock.SetOption(Net::Socket::Option::ReuseAddress, true);
-    tcpListenSock.Listen(Net::Address::MakeBind(port, Net::Protocol::TCP, Net::Address::Family::IPv4));
+Server::Server(const Net::Protocol protocol, const Net::Address::port_t port) : port(port) {
+    if (protocol == Net::Protocol::TCP) {
+        listenTransport = std::make_unique<Net::TcpTransport>();
+    } else {
+        listenTransport = std::make_unique<Net::UdpTransport>();
+    }
 };
 
 int Server::Accept() {
-    Net::Socket tcpClientSock = tcpListenSock.Accept();
-    if (tcpClientSock.IsValid() == false) [[unlikely]] return INVALID_CLIENT_INDEX;
+    Net::Ptr<Net::Transport> clientTransport = listenTransport->Listen(
+        Net::Address::MakeBind(
+            port,
+            dynamic_cast<Net::TcpTransport*>(listenTransport.get()) != nullptr ?
+                Net::Protocol::TCP : Net::Protocol::UDP,
+            Net::Address::Family::IPv4
+        )
+    );
+    if (clientTransport == nullptr) return INVALID_CLIENT_INDEX;
 
     const auto clientIndex = clients.size();
-    clients.push_back(ClientHandle(std::move(tcpClientSock)));
+    clients.push_back(ClientHandle(std::move(clientTransport)));
 
     ClientHandle& client = clients[clientIndex];
-    client.tcpSock.Receive(client.identifier);
+    std::cout << "Receive mac address...\n";
+    client.transport->Receive(client.identifier);
 
     if (CheckFail(client)) [[unlikely]] goto fail_ret;
 
@@ -43,13 +53,14 @@ int Server::Accept() {
                 .Append(downloadStamp->second.filePath.filename().c_str())
                 .Complete();
 
-            client.tcpSock.Send(packet->RawPtr(), packet->GetSize());
+            client.transport->Send(packet->RawPtr(), packet->GetSize());
             recoveryStamps.erase(downloadStamp);
         } else {
             recoveryStamps.clear();
 
+            std::cout << "Send none stamps.\n";
             Msg::Packet::Header packet { Msg::Opcodes::None };
-            client.tcpSock.Send(packet);
+            client.transport->Send(packet);
         }
 
         if (CheckFail(client)) [[unlikely]] goto fail_ret;
@@ -67,19 +78,19 @@ bool Server::Handle(unsigned int clientIndex) {
     ClientHandle& client = clients[clientIndex];
 
     Msg::Packet* packet = reinterpret_cast<Msg::Packet*>(client.buffer);
-    if (client.tcpSock.Receive(packet) < sizeof(Msg::Packet)) {
+    if (client.transport->Receive(*packet) < sizeof(Msg::Packet)) {
         CheckFail(client);
         return false;
     }
     if (packet->GetDataSize() > 0) {
-        if (client.tcpSock.Receive(client.buffer + sizeof(Msg::Packet), packet->GetDataSize()) == 0) [[unlikely]] return false;
+        if (client.transport->Receive(client.buffer + sizeof(Msg::Packet), packet->GetDataSize()) == 0) [[unlikely]] return false;
     }
 
     return HandlePacket(client, packet);
 }
 
 bool Server::CheckFail(ClientHandle& client) {
-    Net::Status status = client.tcpSock.Fail();
+    Net::Status status = client.transport->Fail();
     if (status == Net::Status::Success) return false;
 
     std::cerr << "client[" << client.identifier.ToString() << "]: " << Net::GetStatusName(status) << ".\n";
@@ -109,11 +120,11 @@ bool Server::HandlePacket(ClientHandle& client, const Msg::Packet* packet) {
 
     switch (packet->GetHeader().opcode) {
         case Msg::Opcodes::Echo: {
-            client.tcpSock.Send(packet->GetDataAs<char>(), packet->GetDataSize());
+            client.transport->Send(packet->GetDataAs<char>(), packet->GetDataSize());
         } break;
         case Msg::Opcodes::Time: {
             const std::time_t serverTime = std::time(nullptr);
-            client.tcpSock.Send(reinterpret_cast<const char*>(&serverTime), sizeof(serverTime));
+            client.transport->Send(reinterpret_cast<const char*>(&serverTime), sizeof(serverTime));
         } break;
         case Msg::Opcodes::Download: {
             const auto request = packet->GetDataAs<Msg::Request::Download>();
@@ -162,7 +173,7 @@ bool Server::HandleDownload(ClientHandle& client, const size_t startPos, const c
 
 sendPacket:
     {
-        client.tcpSock.Send(response);
+        client.transport->Send(response);
 
         if (CheckFail(client)) [[unlikely]] return false;
         if (response.status != Msg::Response::Download::Ready) return true;
@@ -179,14 +190,9 @@ sendPacket:
         const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToSend);
         fileStream.read(client.buffer, chunkSize);
 
-        client.tcpSock.Send(
-            client.buffer, chunkSize,
-            static_cast<Net::Socket::Flags>(
-                ((bytesToSend > chunkSize) ?
-                Net::Socket::MoreDataToSend :
-                Net::Socket::None) | Net::Socket::NoSignal
-            )
-        );
+        client.transport->Send(client.buffer, chunkSize);
+        client.transport->Receive(client.buffer, 1); // ACK
+
         if (CheckFail(client)) {
             recoveryStamps[client.identifier] = DownloadStamp{ filePath, startPos + response.totalSize - bytesToSend };
             return false;
@@ -211,7 +217,7 @@ bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* requ
         while (bytesToReceive > 0) {
             const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToReceive);
 
-            uint received = client.tcpSock.Receive(client.buffer, chunkSize, Net::Socket::WaitAll);
+            uint received = client.transport->Receive(client.buffer, chunkSize);
             if (CheckFail(client)) [[unlikely]] return false;
 
             bytesToReceive -= received;
@@ -231,7 +237,9 @@ bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* requ
     while (bytesToReceive > 0) {
         const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToReceive);
 
-        uint received = client.tcpSock.Receive(client.buffer, chunkSize);
+        uint received = client.transport->Receive(client.buffer, chunkSize);
+        client.transport->Send(client.buffer, 1); // ACK
+
         if (CheckFail(client)) [[unlikely]] {
             fileStream.close();
             std::filesystem::remove(filePath);
