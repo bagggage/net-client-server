@@ -184,10 +184,7 @@ namespace Net {
         }
         // Move semantic.
         Socket(Socket&& other) noexcept {
-            osSocket = other.osSocket;
-            status = other.status;
-            state = other.state;
-            other.osSocket = INVALID_SOCKET;
+            *this = std::move(other);
         }
         // Socket cannot be copied.
         Socket(const Socket&) = delete;
@@ -208,7 +205,8 @@ namespace Net {
         bool Connect(const Address& address);
 
         bool Bind(const Address& address);
-
+        bool Listen();
+    
         /// Starts listening for incoming connections.
         /// - `address`: address to start listening at.
         /// Returns `Address::INVALID_PORT` if failed, valid port otherwise.
@@ -280,6 +278,15 @@ namespace Net {
         inline bool IsListening() const { return state == State::Listening; };
         /// Returns `true` if the `Socket` represents a real os-specific socket, `false` otherwise.
         inline bool IsValid() const { return IsOpen(); }
+
+        Socket& operator=(Socket&& other) {
+            osSocket = other.osSocket;
+            status = other.status;
+            state = other.state;
+            other.osSocket = INVALID_SOCKET;
+
+            return *this;
+        }
     };
 } // namespace Net
 

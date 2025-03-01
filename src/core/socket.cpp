@@ -307,13 +307,12 @@ bool Socket::Bind(const Address& address) {
     return true;
 }
 
-Address::port_t Socket::Listen(const Address& address) {
+bool Socket::Listen() {
     LIBPOG_ASSERT(
         (IsOpen() && state == State::None),
         "Socket can start listening from opened state only, if it's not alredy connected or listening"
     );
 
-    if (Bind(address) == false) return Address::INVALID_PORT;
     if (listen(osSocket, 0) < 0) {
         status = static_cast<Status>(GetLastSystemError());
         Net::Error("Failed to start listening: ", std::system_category().message(static_cast<int>(status)));
@@ -321,6 +320,11 @@ Address::port_t Socket::Listen(const Address& address) {
     }
 
     state = State::Listening;
+    return true;
+}
+
+Address::port_t Socket::Listen(const Address& address) {
+    if (Bind(address) == false || Listen() == false) return Address::INVALID_PORT;
     return address.GetPort();
 }
 
