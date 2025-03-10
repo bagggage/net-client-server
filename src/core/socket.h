@@ -123,7 +123,7 @@ namespace Net {
         std::string ConvertToString() const;
 
         inline port_t GetPort() const { return ntohs(osAddress.ipv4.sin_port); }
-        inline Family GetFamily() const { return static_cast<Family>(ntohs(osAddress.ipv4.sin_family)); }
+        inline Family GetFamily() const { return static_cast<Family>(osAddress.ipv4.sin_family); }
 
         inline bool IsValid() const { return osAddress._validFlag != INVALID_FLAG; }
         inline bool IsLocal() const {

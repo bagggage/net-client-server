@@ -1,11 +1,11 @@
 #include "server.h"
 
-#include <core/packet.h>
-
 #include <iostream>
 #include <fstream>
 #include <algorithm>
 #include <filesystem>
+
+#include <core/packet.h>
 
 static void TakeBitrate(const std::chrono::system_clock::time_point begin, const uint bytes) {
     const auto end = std::chrono::system_clock::now();
@@ -18,29 +18,24 @@ static void TakeBitrate(const std::chrono::system_clock::time_point begin, const
 
 Server::Server(const Net::Protocol protocol, const Net::Address::port_t port) : port(port) {
     if (protocol == Net::Protocol::TCP) {
-        listenTransport = std::make_unique<Net::TcpTransport>();
+        listenServer = std::make_unique<Net::TcpServer>();
     } else {
-        listenTransport = std::make_unique<Net::UdpTransport>();
+        listenServer = std::make_unique<Net::UdpServer>();
     }
+
+    listenServer->Bind(Net::Address::MakeBind(port, protocol));
 };
 
-int Server::Accept() {
-    Net::Ptr<Net::Transport> clientTransport = listenTransport->Listen(
-        Net::Address::MakeBind(
-            port,
-            dynamic_cast<Net::TcpTransport*>(listenTransport.get()) != nullptr ?
-                Net::Protocol::TCP : Net::Protocol::UDP,
-            Net::Address::Family::IPv4
-        )
-    );
-    if (clientTransport == nullptr) return INVALID_CLIENT_INDEX;
+int Server::Listen() {
+    Net::Ptr<Net::Connection> clientConnection = listenServer->Listen();
+    if (clientConnection == nullptr) return INVALID_CLIENT_INDEX;
 
     const auto clientIndex = clients.size();
-    clients.push_back(ClientHandle(std::move(clientTransport)));
+    clients.push_back(ClientHandle(std::move(clientConnection)));
 
     ClientHandle& client = clients[clientIndex];
     std::cout << "Receive mac address...\n";
-    client.transport->Receive(client.identifier);
+    client.connection->Receive(client.identifier);
 
     if (CheckFail(client)) [[unlikely]] goto fail_ret;
 
@@ -53,8 +48,8 @@ int Server::Accept() {
                 .Append(downloadStamp->second.filePath.filename().c_str())
                 .Complete();
 
-            client.transport->Send(packet->RawPtr(), sizeof(Msg::Packet::Header));
-            client.transport->Send(packet->GetDataAs<char>(), packet->GetDataSize());
+            client.connection->Send(packet->RawPtr(), sizeof(Msg::Packet::Header));
+            client.connection->Send(packet->GetDataAs<char>(), packet->GetDataSize());
 
             recoveryStamps.erase(downloadStamp);
         } else {
@@ -62,7 +57,7 @@ int Server::Accept() {
 
             std::cout << "Send none stamps.\n";
             Msg::Packet::Header packet { Msg::Opcodes::None };
-            client.transport->Send(packet);
+            client.connection->Send(packet);
         }
 
         if (CheckFail(client)) [[unlikely]] goto fail_ret;
@@ -80,19 +75,19 @@ bool Server::Handle(unsigned int clientIndex) {
     ClientHandle& client = clients[clientIndex];
 
     Msg::Packet* packet = reinterpret_cast<Msg::Packet*>(client.buffer);
-    if (client.transport->Receive(*packet) < sizeof(Msg::Packet)) {
+    if (client.connection->Receive(*packet) == false) {
         CheckFail(client);
         return false;
     }
     if (packet->GetDataSize() > 0) {
-        if (client.transport->Receive(client.buffer + sizeof(Msg::Packet), packet->GetDataSize()) == 0) [[unlikely]] return false;
+        if (client.connection->Receive(client.buffer + sizeof(Msg::Packet), packet->GetDataSize()) == 0) [[unlikely]] return false;
     }
 
     return HandlePacket(client, packet);
 }
 
 bool Server::CheckFail(ClientHandle& client) {
-    Net::Status status = client.transport->Fail();
+    Net::Status status = client.connection->Fail();
     if (status == Net::Status::Success) return false;
 
     std::cerr << "client[" << client.identifier.ToString() << "]: " << Net::GetStatusName(status) << ".\n";
@@ -123,11 +118,11 @@ bool Server::HandlePacket(ClientHandle& client, const Msg::Packet* packet) {
 
     switch (packet->GetHeader().opcode) {
         case Msg::Opcodes::Echo: {
-            client.transport->Send(packet->GetDataAs<char>(), packet->GetDataSize());
+            client.connection->Send(packet->GetDataAs<char>(), packet->GetDataSize());
         } break;
         case Msg::Opcodes::Time: {
             const std::time_t serverTime = std::time(nullptr);
-            client.transport->Send(reinterpret_cast<const char*>(&serverTime), sizeof(serverTime));
+            client.connection->Send(reinterpret_cast<const char*>(&serverTime), sizeof(serverTime));
         } break;
         case Msg::Opcodes::Download: {
             const auto request = packet->GetDataAs<Msg::Request::Download>();
@@ -176,7 +171,7 @@ bool Server::HandleDownload(ClientHandle& client, const size_t startPos, const c
 
 sendPacket:
     {
-        client.transport->Send(response);
+        client.connection->Send(response);
 
         if (CheckFail(client)) [[unlikely]] return false;
         if (response.status != Msg::Response::Download::Ready) return true;
@@ -186,8 +181,8 @@ sendPacket:
     if (startPos != 0) fileStream.seekg(startPos, std::ios::beg);
 
     const auto beginTime = std::chrono::system_clock::now();
-    
-    client.transport->SetupTimeout();
+
+    //client.connection->SetupTimeout();
 
     // Send file.
     size_t bytesToSend = response.totalSize;
@@ -195,11 +190,11 @@ sendPacket:
         const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToSend);
         fileStream.read(client.buffer, chunkSize);
 
-        client.transport->Send(client.buffer, chunkSize);
+        client.connection->Send(client.buffer, chunkSize);
         // ACK
-        if (client.transport->Receive(client.buffer, 1) != 1 || CheckFail(client)) {
+        if (client.connection->Receive(client.buffer, 1) != 1 || CheckFail(client)) {
             recoveryStamps[client.identifier] = DownloadStamp{ filePath, startPos + response.totalSize - bytesToSend };
-            client.transport->DropTimeout();
+            //client.connection->DropTimeout();
             return false;
         }
 
@@ -207,7 +202,7 @@ sendPacket:
     }
 
     TakeBitrate(beginTime, response.totalSize);
-    client.transport->DropTimeout();
+    //client.connection->DropTimeout();
 
     return true;
 }
@@ -223,7 +218,7 @@ bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* requ
         while (bytesToReceive > 0) {
             const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToReceive);
 
-            uint received = client.transport->Receive(client.buffer, chunkSize);
+            uint received = client.connection->Receive(client.buffer, chunkSize);
             if (CheckFail(client)) [[unlikely]] return false;
 
             bytesToReceive -= received;
@@ -239,19 +234,19 @@ bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* requ
         goto ignoreContent;
     }
 
-    client.transport->SetupTimeout();
+    //client.connection->SetupTimeout();
 
     const auto beginTime = std::chrono::system_clock::now();
     while (bytesToReceive > 0) {
         const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToReceive);
 
-        uint received = client.transport->Receive(client.buffer, chunkSize);
-        client.transport->Send(client.buffer, 1); // ACK
+        uint received = client.connection->Receive(client.buffer, chunkSize);
+        client.connection->Send(client.buffer, 1); // ACK
 
         if (CheckFail(client)) [[unlikely]] {
             fileStream.close();
             std::filesystem::remove(filePath);
-            client.transport->DropTimeout();
+            //client.connection->DropTimeout();
             return false;
         }
 
@@ -260,7 +255,7 @@ bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* requ
     }
 
     TakeBitrate(beginTime, fileSize);
-    client.transport->DropTimeout();
+    //client.connection->DropTimeout();
 
     std::cout << "File saved at " << filePath << ".\n";
     return true;

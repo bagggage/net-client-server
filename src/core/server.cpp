@@ -4,6 +4,8 @@ using namespace Net;
 
 static bool SocketOpenAndBind(Socket& socket, const Address& address) {
     if (!socket.Open(address.GetFamily(), Protocol::TCP)) return false;
+    socket.SetOption<int>(Socket::Option::ReuseAddress, true);
+
     if (!socket.Bind(address)) {
         socket.Close();
         return false;

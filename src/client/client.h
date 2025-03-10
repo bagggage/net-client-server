@@ -9,8 +9,9 @@
 
 #define LIBPOG_LOGS false
 
+#include <core/net.h>
+#include <core/connection.h>
 #include <core/socket.h>
-#include <core/transport.h>
 
 class Client {
 public:
@@ -28,7 +29,7 @@ public:
     static const char* GetLoadResultName(const LoadResult result);
 
 private:
-    Net::Ptr<Net::Transport> transport;
+    Net::Ptr<Net::Connection> connection;
     std::array<char, DEFAULT_BUFFER_SIZE> buffer;
 
 public:
@@ -44,7 +45,7 @@ public:
     LoadResult HandleDownloadRecovery(std::string& outFileName);
     bool Close();
 
-    inline Net::Status GetStatus() const { return transport->Fail(); }
+    inline Net::Status GetStatus() const { return connection->Fail(); }
 };
 
 #endif // _CLIENT_H

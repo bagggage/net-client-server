@@ -5,10 +5,10 @@
 #include <filesystem>
 #include <unordered_map>
 
+#include <core/server.h>
 #include <core/socket.h>
 #include <core/packet.h>
 #include <core/net.h>
-#include <core/transport.h>
 
 class Server {
 public:
@@ -19,15 +19,15 @@ public:
 private:
     class ClientHandle {
     public:
-        Net::Ptr<Net::Transport> transport;
+        Net::Ptr<Net::Connection> connection;
         Net::MacAddress identifier;
         char* buffer = nullptr;
 
-        ClientHandle(Net::Ptr<Net::Transport>&& transport) : transport(std::move(transport)) {
+        ClientHandle(Net::Ptr<Net::Connection>&& connection) : connection(std::move(connection)) {
             buffer = new char[DEFAULT_BUFFER_SIZE];
         }
         ClientHandle(ClientHandle&& other) {
-            transport.reset(other.transport.release());
+            connection.reset(other.connection.release());
 
             buffer = other.buffer;
             identifier = other.identifier;
@@ -53,7 +53,7 @@ private:
         size_t position;
     };
 
-    Net::Ptr<Net::Transport> listenTransport;
+    Net::Ptr<Net::Server> listenServer;
     std::vector<ClientHandle> clients;
     std::unordered_map<Net::MacAddress, DownloadStamp> recoveryStamps;
 
@@ -68,13 +68,13 @@ private:
 public:
     Server(const Net::Protocol protocol, const Net::Address::port_t port);
 
-    int Accept();
+    int Listen();
     bool Handle(unsigned int clientIndex);
 
     inline void SetHostDirectory(std::string_view path) { hostDirectory = path; }
 
-    inline Net::Status Fail() { return listenTransport->Fail(); }
-    inline Net::Status ClientFail(unsigned int clientIndex) { return clients[clientIndex].transport->Fail(); }
+    inline Net::Status Fail() { return listenServer->Fail(); }
+    inline Net::Status ClientFail(unsigned int clientIndex) { return clients[clientIndex].connection->Fail(); }
 };
 
 #endif

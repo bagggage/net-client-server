@@ -4,8 +4,12 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <memory>
 
 namespace Net {
+    template<typename T>
+    using Ptr = std::unique_ptr<T>;
+
     struct MacAddress {
         std::array<uint8_t, 6> bytes = {0};
 

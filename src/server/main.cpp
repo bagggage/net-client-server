@@ -102,9 +102,9 @@ int main(int argc, const char** argv) {
     std::cout << "Server listening at port: " << config.port << ".\n";
 
     while (true) {
-        const int clientIndex = server.Accept();
+        const int clientIndex = server.Listen();
         if (clientIndex == Server::INVALID_CLIENT_INDEX) {
-            std::cout << "Accept failed: " << Net::GetStatusName(server.Fail()) << ".\n";
+            std::cout << "Listen failed: " << Net::GetStatusName(server.Fail()) << ".\n";
             continue;
         }
 

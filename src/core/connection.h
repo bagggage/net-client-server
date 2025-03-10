@@ -5,12 +5,14 @@
 
 namespace Net {
     class Connection {
-        virtual void Close() = 0;
+        virtual void Close() {}
     public:
         virtual ~Connection() { Close(); }
 
         virtual bool Send(const void* buffer, const unsigned int size) = 0;
         virtual bool Receive(void* buffer, const unsigned int size) = 0;
+
+        virtual Status Fail() = 0;
 
         template<typename T>
         bool Send(const T& object) {
@@ -33,12 +35,14 @@ namespace Net {
         friend class TcpServer;
     public:
         bool Send(const void* buffer, const unsigned int size) override {
-            return socket.Send(reinterpret_cast<const char*>(buffer), size) > 0;
+            return socket.Send(reinterpret_cast<const char*>(buffer), size) == size;
         }
 
         bool Receive(void* buffer, const unsigned int size) override {
-            return socket.Receive(reinterpret_cast<char*>(buffer), size, Net::Socket::WaitAll) > 0;
+            return socket.Receive(reinterpret_cast<char*>(buffer), size, Net::Socket::WaitAll) == size;
         }
+
+        Status Fail() override { return socket.Fail(); }
     };
 }
 

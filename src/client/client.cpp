@@ -2,6 +2,7 @@
 
 #include <fstream>
 
+#include <core/client.h>
 #include <core/packet.h>
 #include <core/net.h>
 
@@ -26,13 +27,10 @@ const char* Client::GetLoadResultName(const LoadResult result) {
 
 Client::LoadResult Client::HandleDownloadRecovery(std::string& outFileName) {
     Msg::Packet packet {};
-    transport->Receive(packet);
-    if (transport->GetStatus() != Net::Status::Success) [[unlikely]] return NetworkError;
-
+    if (connection->Receive(packet) == false) [[unlikely]] return NetworkError;
     if (!packet.Is(Msg::Opcodes::DownloadRecovery)) return NoSuchFile;
 
-    transport->Receive(buffer.data(), packet.GetDataSize());
-    if (transport->GetStatus() != Net::Status::Success) [[unlikely]] return NetworkError;
+    if (connection->Receive(buffer.data(), packet.GetDataSize()) == false) [[unlikely]] return NetworkError;
 
     const auto response = reinterpret_cast<Msg::Response::DownloadRecovery*>(buffer.data());
     outFileName = response->fileName;
@@ -44,19 +42,17 @@ bool Client::Connect(const Net::Protocol protocol, const std::string& address, u
     const Net::Address serverAddress = Net::Address::FromDomain(address.c_str(), port);
 
     if (protocol == Net::Protocol::TCP) {
-        transport = std::make_unique<Net::TcpTransport>();
+        connection = Net::TcpClient::Connect(serverAddress);
     } else {
-        transport = std::make_unique<Net::UdpTransport>();
+        connection = Net::UdpClient::Connect(serverAddress);
     }
 
-    if (transport->Connect(serverAddress) == false) return false;
+    if (connection->Fail()) return false;
 
     std::cout << "Send mac address.\n";
 
     const Net::MacAddress macAddress = Net::GetMacAddress();
-    transport->Send(macAddress);
-
-    if (transport->GetStatus() != Net::Status::Success) [[unlikely]] return false;
+    if (connection->Send(macAddress) == false) [[unlikely]] return false;
 
     return true;
 }
@@ -65,10 +61,10 @@ std::string_view Client::Echo(const std::string_view message) {
     auto builder = Msg::Packet::Build(Msg::Opcodes::Echo);
     const auto* packet = builder.Append(message.begin(), message.size() + 1).Complete();
 
-    if (!transport->Send(packet->RawPtr(), sizeof(Msg::Packet::Header))) [[unlikely]] return {};
-    if (!transport->Send(packet->RawPtr() + sizeof(Msg::Packet::Header), packet->GetDataSize())) [[unlikely]] return {};
+    if (!connection->Send(packet->RawPtr(), sizeof(Msg::Packet::Header))) [[unlikely]] return {};
+    if (!connection->Send(packet->RawPtr() + sizeof(Msg::Packet::Header), packet->GetDataSize())) [[unlikely]] return {};
 
-    if (!transport->Receive(buffer.data(), message.size() + 1)) [[unlikely]] return {};
+    if (!connection->Receive(buffer.data(), message.size() + 1)) [[unlikely]] return {};
 
     return std::string_view(buffer.data(), message.size());
 }
@@ -77,8 +73,8 @@ std::time_t Client::Time() {
     auto builder = Msg::Packet::Build(Msg::Opcodes::Time);
     const auto* packet = builder.Complete();
 
-    if (!transport->Send(packet->RawPtr(), packet->GetSize())) [[unlikely]] return 0;
-    if (!transport->Receive(buffer.data(), sizeof(std::time_t))) [[unlikely]] return 0;
+    if (!connection->Send(packet->RawPtr(), packet->GetSize())) [[unlikely]] return 0;
+    if (!connection->Receive(buffer.data(), sizeof(std::time_t))) [[unlikely]] return 0;
 
     return *reinterpret_cast<const std::time_t*>(buffer.data());
 }
@@ -98,10 +94,10 @@ Client::LoadResult Client::Download(const std::string_view fileName, const size_
     auto builder = Msg::Packet::Build(Msg::Opcodes::Download);
     const auto* packet = builder.Append(request).Append(fileName).Complete();
 
-    if (!transport->Send(packet->RawPtr(), sizeof(Msg::Packet::Header))) [[unlikely]] goto ret;
-    if (!transport->Send(packet->RawPtr() + sizeof(Msg::Packet::Header), packet->GetDataSize())) [[unlikely]] goto ret;
+    if (!connection->Send(packet->RawPtr(), sizeof(Msg::Packet::Header))) [[unlikely]] goto ret;
+    if (!connection->Send(packet->RawPtr() + sizeof(Msg::Packet::Header), packet->GetDataSize())) [[unlikely]] goto ret;
 
-    if (!transport->Receive(buffer.data(), sizeof(Msg::Response::Download))) [[unlikely]] goto ret;
+    if (!connection->Receive(buffer.data(), sizeof(Msg::Response::Download))) [[unlikely]] goto ret;
 
     {
         const Msg::Response::Download* response = reinterpret_cast<Msg::Response::Download*>(buffer.data());
@@ -121,8 +117,8 @@ Client::LoadResult Client::Download(const std::string_view fileName, const size_
             while (bytesToReceive > 0) {
                 const size_t chunkSize = std::min(buffer.size(), bytesToReceive);
 
-                uint received = transport->Receive(buffer.data(), chunkSize);
-                transport->Send(buffer.data(), 1); // ACK
+                uint received = connection->Receive(buffer.data(), chunkSize);
+                connection->Send(buffer.data(), 1); // ACK
 
                 if (received == 0) goto ret;
 
@@ -160,8 +156,8 @@ Client::LoadResult Client::Upload(const std::string_view filePathStr) {
         .Append(filePath.filename().c_str())
         .Complete();
 
-    if (!transport->Send(packet->RawPtr(), sizeof(Msg::Packet::Header))) [[unlikely]] return NetworkError;
-    if (!transport->Send(packet->RawPtr() + sizeof(Msg::Packet::Header), packet->GetDataSize())) [[unlikely]] return NetworkError;
+    if (!connection->Send(packet->RawPtr(), sizeof(Msg::Packet::Header))) [[unlikely]] return NetworkError;
+    if (!connection->Send(packet->RawPtr() + sizeof(Msg::Packet::Header), packet->GetDataSize())) [[unlikely]] return NetworkError;
 
     const auto beginTime = std::chrono::system_clock::now();
 
@@ -170,8 +166,8 @@ Client::LoadResult Client::Upload(const std::string_view filePathStr) {
         const size_t chunkSize = std::min(buffer.size(), bytesToSend);
         fileStream.read(buffer.data(), chunkSize);
 
-        uint sended = transport->Send(buffer.data(), chunkSize);
-        transport->Receive(buffer.data(), 1); // ACK
+        uint sended = connection->Send(buffer.data(), chunkSize);
+        connection->Receive(buffer.data(), 1); // ACK
 
         if (sended != chunkSize) [[unlikely]] return NetworkError;
 
@@ -187,5 +183,5 @@ bool Client::Close() {
     auto builder = Msg::Packet::Build(Msg::Opcodes::Close);
     const auto* packet = builder.Complete();
 
-    return transport->Send(packet->RawPtr(), packet->GetSize()) == packet->GetSize();
+    return connection->Send(packet->RawPtr(), packet->GetSize()) == packet->GetSize();
 }
