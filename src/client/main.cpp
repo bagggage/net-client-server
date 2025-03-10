@@ -1,6 +1,6 @@
-#include "clientConsole.h"
-
 #include <iostream>
+
+#include "clientConsole.h"
 
 int main(int argc, const char** argv) {
     StdIoConsoleStream stream;

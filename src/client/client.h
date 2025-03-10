@@ -9,8 +9,8 @@
 
 #define LIBPOG_LOGS false
 
-#include "socket.h"
-#include "transport.h"
+#include <core/socket.h>
+#include <core/transport.h>
 
 class Client {
 public:

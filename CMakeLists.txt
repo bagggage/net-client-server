@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5.0)
 project(net-labs VERSION 0.1.0 LANGUAGES C CXX)
 
-include_directories(src/core)
+include_directories(src)
 
 aux_source_directory(src/core CORE_SOURCES)
 aux_source_directory(src/client CLIENT_SOURCES)

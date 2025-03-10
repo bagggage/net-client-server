@@ -5,10 +5,10 @@
 #include <filesystem>
 #include <unordered_map>
 
-#include "socket.h"
-#include "packet.h"
-#include "net.h"
-#include "transport.h"
+#include <core/socket.h>
+#include <core/packet.h>
+#include <core/net.h>
+#include <core/transport.h>
 
 class Server {
 public:

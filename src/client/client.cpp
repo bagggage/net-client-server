@@ -1,8 +1,9 @@
 #include "client.h"
-#include "packet.h"
-#include "net.h"
 
 #include <fstream>
+
+#include <core/packet.h>
+#include <core/net.h>
 
 static void TakeBitrate(const std::chrono::system_clock::time_point begin, const uint bytes) {
     const auto end = std::chrono::system_clock::now();

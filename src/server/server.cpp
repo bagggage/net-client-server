@@ -1,6 +1,6 @@
 #include "server.h"
 
-#include "packet.h"
+#include <core/packet.h>
 
 #include <iostream>
 #include <fstream>

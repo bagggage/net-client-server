@@ -1,10 +1,11 @@
-#include "args.h"
-#include "message.h"
-#include "socket.h"
-#include "server.h"
-
 #include <iostream>
 #include <filesystem>
+
+#include <core/args.h>
+#include <core/message.h>
+#include <core/socket.h>
+
+#include "server.h"
 
 struct ServerConfig {
     Net::Address::port_t port = Msg::DEFAULT_SERVER_PORT;
