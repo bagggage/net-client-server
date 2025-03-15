@@ -16,24 +16,13 @@ static void TakeBitrate(const std::chrono::system_clock::time_point begin, const
     std::cout << "Bitrate: " << bitrate << " Mb/s.\n";
 }
 
-Server::Server(const Net::Protocol protocol, const Net::Address::port_t port) : port(port) {
-    if (protocol == Net::Protocol::TCP) {
-        listenServer = std::make_unique<Net::TcpServer>();
-    } else {
-        listenServer = std::make_unique<Net::UdpServer>();
-    }
-
-    listenServer->Bind(Net::Address::MakeBind(port, protocol));
+Server::Server(const Net::Address::port_t port) : port(port) {
+    listenServer = std::make_unique<Net::TcpServer>();
+    listenServer->Bind(Net::Address::MakeBind(port, Net::Protocol::TCP));
 };
 
-int Server::Listen() {
-    Net::Ptr<Net::Connection> clientConnection = listenServer->Listen();
-    if (clientConnection == nullptr) return INVALID_CLIENT_INDEX;
-
-    const auto clientIndex = clients.size();
-    clients.push_back(ClientHandle(std::move(clientConnection)));
-
-    ClientHandle& client = clients[clientIndex];
+void Server::Accept(Net::Connection* clientConnection) {
+    ClientHandle& client = clients.at(clientConnection);
     std::cout << "Receive mac address...\n";
     client.connection->Receive(client.identifier);
 
@@ -64,15 +53,36 @@ int Server::Listen() {
     }
 
     std::cout << "Client [" << client.identifier.ToString() << "] connected.\n";
-    return clientIndex;
+    return;
 
 fail_ret:
-    std::cerr << "Client connection failed.\n"; 
-    return INVALID_CLIENT_INDEX;
+    std::cout << "Client connection failed.\n";
+    return;
 }
 
-bool Server::Handle(unsigned int clientIndex) {
-    ClientHandle& client = clients[clientIndex];
+Net::Connection* Server::Listen() {
+    Net::Connection* clientConnection = nullptr;
+    bool is_new_client = false;
+
+    do {
+        is_new_client = false;
+
+        clientConnection = listenServer->Listen();
+        if (clientConnection == nullptr) return nullptr;
+
+        if (clients.count(clientConnection) == 0) {
+            is_new_client = true;
+            clients.insert({ clientConnection, ClientHandle(clientConnection) });
+
+            Accept(clientConnection);
+        }
+    } while (is_new_client);
+    
+    return clientConnection;
+}
+
+bool Server::HandleClient(Net::Connection* clientConnection) {
+    ClientHandle& client = clients.at(clientConnection);
 
     Msg::Packet* packet = reinterpret_cast<Msg::Packet*>(client.buffer);
     if (client.connection->Receive(*packet) == false) {
@@ -98,12 +108,7 @@ bool Server::CheckFail(ClientHandle& client) {
         case Net::Status::Unreachable:
         case Net::Status::ConnectionRefused:
         case Net::Status::ConnectionReset: {
-            // Swap remove.
-            auto it = std::find(clients.begin(), clients.end(), client);
-            auto last = std::prev(clients.end());
-            if (it != last) std::iter_swap(it, last);
-
-            clients.pop_back();
+            clients.erase(client.connection.get());
             return false;
         }
         default:
