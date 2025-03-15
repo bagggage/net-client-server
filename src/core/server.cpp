@@ -15,36 +15,75 @@ static bool SocketOpenAndBind(Socket& socket, const Address& address) {
 }
 
 bool TcpServer::Bind(const Address& address) {
-    return SocketOpenAndBind(socket, address);
+    if (!SocketOpenAndBind(socket, address)) return false;
+
+    pollfd serverSocket;
+    serverSocket.fd = socket.GetOsSocket();
+    serverSocket.events = POLLIN;
+
+    pollSet.push_back(serverSocket);
+
+    return true;
 }
 
-Ptr<Connection> TcpServer::Listen() {
-    if (!socket.IsListening()) {
-        if (!socket.Listen()) return nullptr;
-    }
-
+Connection* TcpServer::Accept() {
     Socket clientSocket = socket.Accept();
     if (!clientSocket.IsValid()) return nullptr;
 
-    Ptr<SocketConnection> connection = std::make_unique<SocketConnection>();
+    SocketConnection* connection = new SocketConnection();
     connection->socket = std::move(clientSocket);
+
+    clientConnections.push_back(connection);
+
+    pollfd clientFd;
+    clientFd.fd = connection->socket.GetOsSocket();
+    clientFd.events = POLLIN | POLLHUP;
+
+    pollSet.push_back(clientFd);
 
     return connection;
 }
 
-bool UdpServer::Bind(const Address& address) {
-    return SocketOpenAndBind(socket, address);
+void TcpServer::RemoveClient(const uint client_idx) {
+    clientConnections.erase(clientConnections.begin() + client_idx);
+    pollSet.erase(pollSet.begin() + client_idx + 1);
 }
 
-Ptr<Connection> UdpServer::Listen() {
-    Ptr<ClientConnection> clientConnection = std::make_unique<ClientConnection>();
-    char connectBuffer[sizeof(CONNECT_MAGIC)] = { 0 };
+Connection* TcpServer::Listen() {
+    static size_t last_poll = pollSet.size();
 
-    socket.ReceiveFrom(connectBuffer, sizeof(connectBuffer), clientConnection->clientAddress, Socket::WaitAll);
-    if (strcmp(connectBuffer, CONNECT_MAGIC) != 0) return nullptr;
+    while (true) {
+        Connection* result = nullptr;
+        for (; last_poll < pollSet.size(); ++last_poll) {
+            const auto client_idx = last_poll - 1;
+            const auto revents = pollSet[last_poll].revents;
 
-    clientConnection->serverSocket = &socket;
-    if (!clientConnection->Send(ACCEPT_MAGIC, sizeof(ACCEPT_MAGIC))) return nullptr;
+            if (revents & POLLIN) {
+                if (last_poll == 0) {
+                    result = Accept();
+                } else {
+                    result = clientConnections[client_idx];
+                }
+            }
+            else if (revents & POLLHUP) {
+                result = clientConnections[client_idx];
+                RemoveClient(client_idx);
 
-    return clientConnection;
+                return result;
+            }
+            else {
+                continue;
+            }
+
+            last_poll++;
+            return result;
+        }
+
+        if (!socket.IsListening()) {
+            if (!socket.Listen()) return nullptr;
+        }
+
+        last_poll = 0;
+        if (poll(pollSet.data(), pollSet.size(), -1) < 0) return nullptr;
+    }
 }

@@ -206,6 +206,8 @@ namespace Net {
 
         bool Bind(const Address& address);
         bool Listen();
+
+        SOCKET GetOsSocket() const { return osSocket; }
     
         /// Starts listening for incoming connections.
         /// - `address`: address to start listening at.

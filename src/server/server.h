@@ -23,7 +23,7 @@ private:
         Net::MacAddress identifier;
         char* buffer = nullptr;
 
-        ClientHandle(Net::Ptr<Net::Connection>&& connection) : connection(std::move(connection)) {
+        ClientHandle(Net::Connection* connection) : connection(connection) {
             buffer = new char[DEFAULT_BUFFER_SIZE];
         }
         ClientHandle(ClientHandle&& other) {
@@ -54,7 +54,8 @@ private:
     };
 
     Net::Ptr<Net::Server> listenServer;
-    std::vector<ClientHandle> clients;
+
+    std::unordered_map<Net::Connection*, ClientHandle> clients;
     std::unordered_map<Net::MacAddress, DownloadStamp> recoveryStamps;
 
     Net::Address::port_t port;
@@ -65,16 +66,18 @@ private:
     bool HandleDownload(ClientHandle& client, const size_t startPos, const char* fileName);
     bool HandleUpload(ClientHandle& client, const Msg::Request::Upload* request);
 
-public:
-    Server(const Net::Protocol protocol, const Net::Address::port_t port);
+    void Accept(Net::Connection* clientConnection);
 
-    int Listen();
-    bool Handle(unsigned int clientIndex);
+public:
+    Server(const Net::Address::port_t port);
+
+    Net::Connection* Listen();
+    bool HandleClient(Net::Connection* clientConnection);
 
     inline void SetHostDirectory(std::string_view path) { hostDirectory = path; }
 
     inline Net::Status Fail() { return listenServer->Fail(); }
-    inline Net::Status ClientFail(unsigned int clientIndex) { return clients[clientIndex].connection->Fail(); }
+    inline Net::Status ClientFail(Net::Connection* clientConnection) { return clients.at(clientConnection).connection->Fail(); }
 };
 
 #endif
