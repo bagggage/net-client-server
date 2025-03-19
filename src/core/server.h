@@ -44,12 +44,12 @@ namespace Net {
             friend class UdpServer;
 
         public:
-            bool Send(const void* buffer, const unsigned int size) override {
-                return serverSocket->SendTo(clientAddress, reinterpret_cast<const char*>(buffer), size) > 0;
+            uint Send(const void* buffer, const unsigned int size) override {
+                return serverSocket->SendTo(clientAddress, reinterpret_cast<const char*>(buffer), size);
             }
 
-            bool Receive(void* buffer, const unsigned int size) override {
-                return serverSocket->Receive(reinterpret_cast<char*>(buffer), size, Net::Socket::WaitAll) > 0;
+            uint Receive(void* buffer, const unsigned int size) override {
+                return serverSocket->Receive(reinterpret_cast<char*>(buffer), size, Net::Socket::WaitAll);
             }
 
             Status Fail() override { return serverSocket->Fail(); }

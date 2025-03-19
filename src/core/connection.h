@@ -9,18 +9,18 @@ namespace Net {
     public:
         virtual ~Connection() { Close(); }
 
-        virtual bool Send(const void* buffer, const unsigned int size) = 0;
-        virtual bool Receive(void* buffer, const unsigned int size) = 0;
+        virtual uint Send(const void* buffer, const unsigned int size) = 0;
+        virtual uint Receive(void* buffer, const unsigned int size) = 0;
 
         virtual Status Fail() = 0;
 
         template<typename T>
-        bool Send(const T& object) {
+        uint Send(const T& object) {
             return Send(reinterpret_cast<const void*>(&object), sizeof(T));
         }
 
         template<typename T>
-        bool Receive(T& object) {
+        uint Receive(T& object) {
             return Receive(reinterpret_cast<void*>(&object), sizeof(T));
         }
     };
@@ -34,12 +34,12 @@ namespace Net {
         friend class UdpClient;
         friend class TcpServer;
     public:
-        bool Send(const void* buffer, const unsigned int size) override {
-            return socket.Send(reinterpret_cast<const char*>(buffer), size) == size;
+        uint Send(const void* buffer, const unsigned int size) override {
+            return socket.Send(reinterpret_cast<const char*>(buffer), size);
         }
 
-        bool Receive(void* buffer, const unsigned int size) override {
-            return socket.Receive(reinterpret_cast<char*>(buffer), size, Net::Socket::WaitAll) == size;
+        uint Receive(void* buffer, const unsigned int size) override {
+            return socket.Receive(reinterpret_cast<char*>(buffer), size, Net::Socket::WaitAll);
         }
 
         Status Fail() override { return socket.Fail(); }
