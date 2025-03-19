@@ -23,7 +23,7 @@ Server::Server(const Net::Address::port_t port) : port(port) {
 void Server::Accept(Net::Connection* clientConnection) {
     ClientHandle& client = clients.at(clientConnection);
     std::cout << "Receive mac address...\n";
-    client.connection->Receive(client.identifier);
+    client.connection->ReceiveAll(client.identifier);
 
     if (CheckFail(client)) [[unlikely]] goto fail_ret;
 
@@ -86,12 +86,12 @@ bool Server::HandleClient(Net::Connection* clientConnection) {
     ClientHandle& client = clients.at(clientConnection);
 
     Msg::Packet* packet = reinterpret_cast<Msg::Packet*>(client.buffer);
-    if (client.connection->Receive(*packet) == false) {
-        if (!CheckFail(client)) OnClientDisconnect(client);
+    if (client.connection->ReceiveAll(*packet) < sizeof(*packet)) {
+        CheckFail(client);
         return false;
     }
     if (packet->GetDataSize() > 0) {
-        if (client.connection->Receive(client.buffer + sizeof(Msg::Packet), packet->GetDataSize()) == 0) [[unlikely]] return false;
+        if (client.connection->ReceiveAll(client.buffer + sizeof(Msg::Packet), packet->GetDataSize()) == 0) [[unlikely]] return false;
     }
 
     return HandlePacket(client, packet);
@@ -249,14 +249,11 @@ bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* requ
     const auto beginTime = std::chrono::system_clock::now();
     while (bytesToReceive > 0) {
         const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToReceive);
-
-        uint received = client.connection->Receive(client.buffer, chunkSize);
-        client.connection->Send(client.buffer, 1); // ACK
+        const uint received = client.connection->Receive(client.buffer, chunkSize);
 
         if (CheckFail(client)) [[unlikely]] {
             fileStream.close();
             std::filesystem::remove(filePath);
-            //client.connection->DropTimeout();
             return false;
         }
 
