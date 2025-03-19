@@ -117,13 +117,10 @@ Client::LoadResult Client::Download(const std::string_view fileName, const size_
             while (bytesToReceive > 0) {
                 const size_t chunkSize = std::min(buffer.size(), bytesToReceive);
 
-                uint received = connection->Receive(buffer.data(), chunkSize);
-                connection->Send(buffer.data(), 1); // ACK
+                if (!connection->Receive(buffer.data(), chunkSize)) goto ret;
 
-                if (received == 0) goto ret;
-
-                fileStream.write(buffer.data(), received);
-                bytesToReceive -= received;
+                fileStream.write(buffer.data(), bytesToReceive);
+                bytesToReceive -= bytesToReceive;
             }
 
             TakeBitrate(beginTime, dataSize);
@@ -166,10 +163,7 @@ Client::LoadResult Client::Upload(const std::string_view filePathStr) {
         const size_t chunkSize = std::min(buffer.size(), bytesToSend);
         fileStream.read(buffer.data(), chunkSize);
 
-        uint sended = connection->Send(buffer.data(), chunkSize);
-        connection->Receive(buffer.data(), 1); // ACK
-
-        if (sended != chunkSize) [[unlikely]] return NetworkError;
+        if (!connection->Send(buffer.data(), chunkSize)) [[unlikely]] return NetworkError;
 
         bytesToSend -= chunkSize;
     }

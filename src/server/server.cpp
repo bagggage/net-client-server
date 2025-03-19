@@ -182,19 +182,14 @@ sendPacket:
 
     const auto beginTime = std::chrono::system_clock::now();
 
-    //client.connection->SetupTimeout();
-
     // Send file.
     size_t bytesToSend = response.totalSize;
     while (bytesToSend > 0) {
         const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToSend);
         fileStream.read(client.buffer, chunkSize);
 
-        client.connection->Send(client.buffer, chunkSize);
-        // ACK
-        if (client.connection->Receive(client.buffer, 1) != 1 || CheckFail(client)) {
+        if (!client.connection->Send(client.buffer, chunkSize)) {
             recoveryStamps[client.identifier] = DownloadStamp{ filePath, startPos + response.totalSize - bytesToSend };
-            //client.connection->DropTimeout();
             return false;
         }
 
@@ -202,8 +197,6 @@ sendPacket:
     }
 
     TakeBitrate(beginTime, response.totalSize);
-    //client.connection->DropTimeout();
-
     return true;
 }
 
@@ -234,28 +227,21 @@ bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* requ
         goto ignoreContent;
     }
 
-    //client.connection->SetupTimeout();
-
     const auto beginTime = std::chrono::system_clock::now();
     while (bytesToReceive > 0) {
         const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToReceive);
 
-        uint received = client.connection->Receive(client.buffer, chunkSize);
-        client.connection->Send(client.buffer, 1); // ACK
-
-        if (CheckFail(client)) [[unlikely]] {
+        if (!client.connection->Receive(client.buffer, chunkSize)) [[unlikely]] {
             fileStream.close();
             std::filesystem::remove(filePath);
-            //client.connection->DropTimeout();
             return false;
         }
 
-        fileStream.write(client.buffer, received);
-        bytesToReceive -= received;
+        fileStream.write(client.buffer, chunkSize);
+        bytesToReceive -= chunkSize;
     }
 
     TakeBitrate(beginTime, fileSize);
-    //client.connection->DropTimeout();
 
     std::cout << "File saved at " << filePath << ".\n";
     return true;
