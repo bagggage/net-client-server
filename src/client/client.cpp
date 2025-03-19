@@ -118,8 +118,6 @@ Client::LoadResult Client::Download(const std::string_view fileName, const size_
                 const size_t chunkSize = std::min(buffer.size(), bytesToReceive);
 
                 uint received = connection->Receive(buffer.data(), chunkSize);
-                connection->Send(buffer.data(), 1); // ACK
-
                 if (received == 0) goto ret;
 
                 fileStream.write(buffer.data(), received);
