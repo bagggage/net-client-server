@@ -6,8 +6,8 @@ using namespace Net;
 
 Ptr<Connection> TcpClient::Connect(const Address& address) {
     Ptr<SocketConnection> connection = std::make_unique<SocketConnection>();
-    if (!connection->socket.Open(address.GetFamily(), Protocol::TCP)) connection;
-    if (!connection->socket.Connect(address)) connection;
+    if (!connection->socket.Open(address.GetFamily(), Protocol::TCP)) return connection;
+    if (!connection->socket.Connect(address)) return connection;
 
     return std::move(connection);
 }
