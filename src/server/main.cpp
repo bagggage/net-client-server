@@ -104,8 +104,7 @@ int main(int argc, const char** argv) {
             continue;
         }
 
-        while (server.HandleClient(client) != false);
-        std::cout << "Client disconnected.\n";
+        server.HandleClient(client);
     }
 
     return EXIT_SUCCESS;

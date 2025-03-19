@@ -150,7 +150,8 @@ namespace Net {
             Broadcast = SO_BROADCAST,
             ReuseAddress = SO_REUSEADDR,
             ReceiveTimeout = SO_RCVTIMEO,
-            SendTimeout = SO_SNDTIMEO
+            SendTimeout = SO_SNDTIMEO,
+            Error = SO_ERROR,
         };
         enum Flags {
             None = 0,
@@ -259,7 +260,10 @@ namespace Net {
         template<typename T>
         bool SetOption(const Option option, const T value) { return SetOption(option, &value, sizeof(value)); }
         template<typename T>
-        bool GetOption(const Option option, T& outValue) const { return GetOption(option, &outValue, sizeof(outValue)); }
+        bool GetOption(const Option option, T& outValue) const {
+            uint sizeOf = sizeof(outValue);
+            return GetOption(option, &outValue, sizeOf);
+        }
 
         /// Returns last error/failure code and clear it.
         inline Status Fail() const {

@@ -17,8 +17,7 @@ static void TakeBitrate(const std::chrono::system_clock::time_point begin, const
 }
 
 Server::Server(const Net::Address::port_t port) : port(port) {
-    listenServer = std::make_unique<Net::TcpServer>();
-    listenServer->Bind(Net::Address::MakeBind(port, Net::Protocol::TCP));
+    listenServer.Bind(Net::Address::MakeBind(port, Net::Protocol::TCP));
 };
 
 void Server::Accept(Net::Connection* clientConnection) {
@@ -52,7 +51,9 @@ void Server::Accept(Net::Connection* clientConnection) {
         if (CheckFail(client)) [[unlikely]] goto fail_ret;
     }
 
-    std::cout << "Client [" << client.identifier.ToString() << "] connected.\n";
+    listenServer.AddToListen(clientConnection);
+
+    std::cout << "Client [" << client.identifier.ToString() << "]: connected.\n";
     return;
 
 fail_ret:
@@ -67,7 +68,7 @@ Net::Connection* Server::Listen() {
     do {
         is_new_client = false;
 
-        clientConnection = listenServer->Listen();
+        clientConnection = listenServer.Listen();
         if (clientConnection == nullptr) return nullptr;
 
         if (clients.count(clientConnection) == 0) {
@@ -86,7 +87,7 @@ bool Server::HandleClient(Net::Connection* clientConnection) {
 
     Msg::Packet* packet = reinterpret_cast<Msg::Packet*>(client.buffer);
     if (client.connection->Receive(*packet) == false) {
-        CheckFail(client);
+        if (!CheckFail(client)) OnClientDisconnect(client);
         return false;
     }
     if (packet->GetDataSize() > 0) {
@@ -108,14 +109,21 @@ bool Server::CheckFail(ClientHandle& client) {
         case Net::Status::Unreachable:
         case Net::Status::ConnectionRefused:
         case Net::Status::ConnectionReset: {
-            clients.erase(client.connection.get());
-            return false;
+            OnClientDisconnect(client);
+            return true;
         }
         default:
             break;
     }
 
     return true;
+}
+
+void Server::OnClientDisconnect(ClientHandle& client) {
+    std::cout << "Client[" << client.identifier.ToString() << "]: disconnected.\n";
+
+    listenServer.RemoveFromListening(client.connection.get());
+    clients.erase(client.connection.get());
 }
 
 bool Server::HandlePacket(ClientHandle& client, const Msg::Packet* packet) {

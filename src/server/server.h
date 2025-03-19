@@ -53,7 +53,7 @@ private:
         size_t position;
     };
 
-    Net::Ptr<Net::Server> listenServer;
+    Net::TcpServer listenServer;
 
     std::unordered_map<Net::Connection*, ClientHandle> clients;
     std::unordered_map<Net::MacAddress, DownloadStamp> recoveryStamps;
@@ -68,6 +68,8 @@ private:
 
     void Accept(Net::Connection* clientConnection);
 
+    void OnClientDisconnect(ClientHandle& client);
+
 public:
     Server(const Net::Address::port_t port);
 
@@ -76,7 +78,7 @@ public:
 
     inline void SetHostDirectory(std::string_view path) { hostDirectory = path; }
 
-    inline Net::Status Fail() { return listenServer->Fail(); }
+    inline Net::Status Fail() { return listenServer.Fail(); }
     inline Net::Status ClientFail(Net::Connection* clientConnection) { return clients.at(clientConnection).connection->Fail(); }
 };
 

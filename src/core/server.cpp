@@ -1,5 +1,7 @@
 #include "server.h"
 
+#include <algorithm>
+
 using namespace Net;
 
 static bool SocketOpenAndBind(Socket& socket, const Address& address) {
@@ -33,20 +35,31 @@ Connection* TcpServer::Accept() {
     SocketConnection* connection = new SocketConnection();
     connection->socket = std::move(clientSocket);
 
-    clientConnections.push_back(connection);
-
-    pollfd clientFd;
-    clientFd.fd = connection->socket.GetOsSocket();
-    clientFd.events = POLLIN | POLLHUP;
-
-    pollSet.push_back(clientFd);
-
     return connection;
 }
 
 void TcpServer::RemoveClient(const uint client_idx) {
     clientConnections.erase(clientConnections.begin() + client_idx);
     pollSet.erase(pollSet.begin() + client_idx + 1);
+}
+
+void TcpServer::AddToListen(Connection* clientConnection) {
+    const auto sockConnection = reinterpret_cast<SocketConnection*>(clientConnection);
+
+    clientConnections.push_back(clientConnection);
+
+    pollfd clientFd;
+    clientFd.fd = sockConnection->socket.GetOsSocket();
+    clientFd.events = POLLIN | POLLHUP;
+
+    pollSet.push_back(clientFd);
+}
+
+void TcpServer::RemoveFromListening(Connection* clientConnection) {
+    const auto iter = std::find(clientConnections.begin(), clientConnections.end(), clientConnection);
+    const auto index = iter - clientConnections.begin();
+
+    RemoveClient(index);
 }
 
 Connection* TcpServer::Listen() {
@@ -64,12 +77,6 @@ Connection* TcpServer::Listen() {
                 } else {
                     result = clientConnections[client_idx];
                 }
-            }
-            else if (revents & POLLHUP) {
-                result = clientConnections[client_idx];
-                RemoveClient(client_idx);
-
-                return result;
             }
             else {
                 continue;

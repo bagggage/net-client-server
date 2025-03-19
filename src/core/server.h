@@ -33,6 +33,9 @@ namespace Net {
         void RemoveClient(const uint client_idx);
 
     public:
+        void AddToListen(Connection* clientConnection);
+        void RemoveFromListening(Connection* clientConnection);
+
         bool Bind(const Address& address) override;
         Connection* Listen() override;
 
