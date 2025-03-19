@@ -204,10 +204,8 @@ sendPacket:
         fileStream.read(client.buffer, chunkSize);
 
         client.connection->Send(client.buffer, chunkSize);
-        // ACK
-        if (client.connection->Receive(client.buffer, 1) != 1 || CheckFail(client)) {
+        if (CheckFail(client)) {
             recoveryStamps[client.identifier] = DownloadStamp{ filePath, startPos + response.totalSize - bytesToSend };
-            //client.connection->DropTimeout();
             return false;
         }
 
@@ -215,7 +213,6 @@ sendPacket:
     }
 
     TakeBitrate(beginTime, response.totalSize);
-    //client.connection->DropTimeout();
 
     return true;
 }
