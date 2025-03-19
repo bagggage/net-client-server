@@ -11,6 +11,7 @@ namespace Net {
 
         virtual uint Send(const void* buffer, const unsigned int size) = 0;
         virtual uint Receive(void* buffer, const unsigned int size) = 0;
+        virtual uint ReceiveAll(void* buffer, const unsigned int size) = 0;
 
         virtual Status Fail() = 0;
 
@@ -22,6 +23,11 @@ namespace Net {
         template<typename T>
         uint Receive(T& object) {
             return Receive(reinterpret_cast<void*>(&object), sizeof(T));
+        }
+
+        template<typename T>
+        uint ReceiveAll(T& object) {
+            return ReceiveAll(reinterpret_cast<void*>(&object), sizeof(T));
         }
     };
 
@@ -39,6 +45,10 @@ namespace Net {
         }
 
         uint Receive(void* buffer, const unsigned int size) override {
+            return socket.Receive(reinterpret_cast<char*>(buffer), size);
+        }
+
+        uint ReceiveAll(void* buffer, const unsigned int size) override {
             return socket.Receive(reinterpret_cast<char*>(buffer), size, Net::Socket::WaitAll);
         }
 

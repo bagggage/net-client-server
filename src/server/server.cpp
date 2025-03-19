@@ -35,7 +35,7 @@ int Server::Listen() {
 
     ClientHandle& client = clients[clientIndex];
     std::cout << "Receive mac address...\n";
-    client.connection->Receive(client.identifier);
+    client.connection->ReceiveAll(client.identifier);
 
     if (CheckFail(client)) [[unlikely]] goto fail_ret;
 
@@ -75,12 +75,12 @@ bool Server::Handle(unsigned int clientIndex) {
     ClientHandle& client = clients[clientIndex];
 
     Msg::Packet* packet = reinterpret_cast<Msg::Packet*>(client.buffer);
-    if (client.connection->Receive(*packet) == false) {
+    if (client.connection->ReceiveAll(*packet) < sizeof(*packet)) {
         CheckFail(client);
         return false;
     }
     if (packet->GetDataSize() > 0) {
-        if (client.connection->Receive(client.buffer + sizeof(Msg::Packet), packet->GetDataSize()) == 0) [[unlikely]] return false;
+        if (client.connection->ReceiveAll(client.buffer + sizeof(Msg::Packet), packet->GetDataSize()) == 0) [[unlikely]] return false;
     }
 
     return HandlePacket(client, packet);
@@ -230,15 +230,16 @@ bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* requ
     const auto beginTime = std::chrono::system_clock::now();
     while (bytesToReceive > 0) {
         const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToReceive);
+        const uint received = client.connection->Receive(client.buffer, chunkSize);
 
-        if (!client.connection->Receive(client.buffer, chunkSize)) [[unlikely]] {
+        if (CheckFail(client)) [[unlikely]] {
             fileStream.close();
             std::filesystem::remove(filePath);
             return false;
         }
 
-        fileStream.write(client.buffer, chunkSize);
-        bytesToReceive -= chunkSize;
+        fileStream.write(client.buffer, received);
+        bytesToReceive -= received;
     }
 
     TakeBitrate(beginTime, fileSize);

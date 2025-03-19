@@ -49,6 +49,10 @@ namespace Net {
             }
 
             uint Receive(void* buffer, const unsigned int size) override {
+                return serverSocket->Receive(reinterpret_cast<char*>(buffer), size);
+            }
+
+            uint ReceiveAll(void* buffer, const unsigned int size) override {
                 return serverSocket->Receive(reinterpret_cast<char*>(buffer), size, Net::Socket::WaitAll);
             }
 

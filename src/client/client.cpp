@@ -27,10 +27,10 @@ const char* Client::GetLoadResultName(const LoadResult result) {
 
 Client::LoadResult Client::HandleDownloadRecovery(std::string& outFileName) {
     Msg::Packet packet {};
-    if (connection->Receive(packet) == false) [[unlikely]] return NetworkError;
+    if (connection->ReceiveAll(packet) < sizeof(packet)) [[unlikely]] return NetworkError;
     if (!packet.Is(Msg::Opcodes::DownloadRecovery)) return NoSuchFile;
 
-    if (connection->Receive(buffer.data(), packet.GetDataSize()) == false) [[unlikely]] return NetworkError;
+    if (connection->ReceiveAll(buffer.data(), packet.GetDataSize()) < packet.GetDataSize()) [[unlikely]] return NetworkError;
 
     const auto response = reinterpret_cast<Msg::Response::DownloadRecovery*>(buffer.data());
     outFileName = response->fileName;
@@ -64,7 +64,7 @@ std::string_view Client::Echo(const std::string_view message) {
     if (!connection->Send(packet->RawPtr(), sizeof(Msg::Packet::Header))) [[unlikely]] return {};
     if (!connection->Send(packet->RawPtr() + sizeof(Msg::Packet::Header), packet->GetDataSize())) [[unlikely]] return {};
 
-    if (!connection->Receive(buffer.data(), message.size() + 1)) [[unlikely]] return {};
+    if (!connection->ReceiveAll(buffer.data(), message.size() + 1)) [[unlikely]] return {};
 
     return std::string_view(buffer.data(), message.size());
 }
@@ -74,7 +74,7 @@ std::time_t Client::Time() {
     const auto* packet = builder.Complete();
 
     if (!connection->Send(packet->RawPtr(), packet->GetSize())) [[unlikely]] return 0;
-    if (!connection->Receive(buffer.data(), sizeof(std::time_t))) [[unlikely]] return 0;
+    if (!connection->ReceiveAll(buffer.data(), sizeof(std::time_t))) [[unlikely]] return 0;
 
     return *reinterpret_cast<const std::time_t*>(buffer.data());
 }
@@ -97,7 +97,7 @@ Client::LoadResult Client::Download(const std::string_view fileName, const size_
     if (!connection->Send(packet->RawPtr(), sizeof(Msg::Packet::Header))) [[unlikely]] goto ret;
     if (!connection->Send(packet->RawPtr() + sizeof(Msg::Packet::Header), packet->GetDataSize())) [[unlikely]] goto ret;
 
-    if (!connection->Receive(buffer.data(), sizeof(Msg::Response::Download))) [[unlikely]] goto ret;
+    if (!connection->ReceiveAll(buffer.data(), sizeof(Msg::Response::Download))) [[unlikely]] goto ret;
 
     {
         const Msg::Response::Download* response = reinterpret_cast<Msg::Response::Download*>(buffer.data());
@@ -116,11 +116,12 @@ Client::LoadResult Client::Download(const std::string_view fileName, const size_
             size_t bytesToReceive = response->totalSize;
             while (bytesToReceive > 0) {
                 const size_t chunkSize = std::min(buffer.size(), bytesToReceive);
+                const uint received = connection->Receive(buffer.data(), chunkSize);
+    
+                if (received == 0) goto ret;
 
-                if (!connection->Receive(buffer.data(), chunkSize)) goto ret;
-
-                fileStream.write(buffer.data(), bytesToReceive);
-                bytesToReceive -= bytesToReceive;
+                fileStream.write(buffer.data(), received);
+                bytesToReceive -= received;
             }
 
             TakeBitrate(beginTime, dataSize);
