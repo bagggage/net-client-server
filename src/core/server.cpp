@@ -2,8 +2,11 @@
 
 using namespace Net;
 
-static bool SocketOpenAndBind(Socket& socket, const Address& address) {
-    if (!socket.Open(address.GetFamily(), Protocol::TCP)) return false;
+static bool SocketOpenAndBind(Socket& socket, const Address& address, const Net::Protocol protocol) {
+    if (!socket.Open(address.GetFamily(), protocol)) {
+        return false;
+    }
+
     socket.SetOption<int>(Socket::Option::ReuseAddress, true);
 
     if (!socket.Bind(address)) {
@@ -15,7 +18,7 @@ static bool SocketOpenAndBind(Socket& socket, const Address& address) {
 }
 
 bool TcpServer::Bind(const Address& address) {
-    return SocketOpenAndBind(socket, address);
+    return SocketOpenAndBind(socket, address, Protocol::TCP);
 }
 
 Ptr<Connection> TcpServer::Listen() {
@@ -33,7 +36,7 @@ Ptr<Connection> TcpServer::Listen() {
 }
 
 bool UdpServer::Bind(const Address& address) {
-    return SocketOpenAndBind(socket, address);
+    return SocketOpenAndBind(socket, address, Protocol::UDP);
 }
 
 Ptr<Connection> UdpServer::Listen() {
