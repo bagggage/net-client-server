@@ -455,3 +455,11 @@ bool Socket::GetOption(const Option option, void* outValue, uint& valueSize) con
     }
     return true;
 }
+
+Address Socket::GetAddress() {
+    Address address;
+    socklen_t size = sizeof(address.osAddress);
+    getsockname(osSocket, &address.osAddress.any, &size);
+
+    return address;
+}

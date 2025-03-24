@@ -122,6 +122,8 @@ namespace Net {
         /// Convert internal os-specific network address to string.
         std::string ConvertToString() const;
 
+        inline void SetPort(port_t port) { osAddress.ipv4.sin_port = htons(port); }
+
         inline port_t GetPort() const { return ntohs(osAddress.ipv4.sin_port); }
         inline Family GetFamily() const { return static_cast<Family>(osAddress.ipv4.sin_family); }
 
@@ -258,6 +260,8 @@ namespace Net {
         bool SetOption(const Option option, const T value) { return SetOption(option, &value, sizeof(value)); }
         template<typename T>
         bool GetOption(const Option option, T& outValue) const { return GetOption(option, &outValue, sizeof(outValue)); }
+
+        Address GetAddress();
 
         /// Returns last error/failure code and clear it.
         inline Status Fail() const {
