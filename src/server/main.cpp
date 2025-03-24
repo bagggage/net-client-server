@@ -1,5 +1,6 @@
 #include <iostream>
 #include <filesystem>
+#include <future>
 
 #include <core/args.h>
 #include <core/message.h>
@@ -66,6 +67,12 @@ static bool ParseServerArgs(int argc, const char** argv, ServerConfig& outConfig
     return result;
 }
 
+void ClientHandleLoop(Server* server, int clientIndex) {
+    while (server->Handle(clientIndex) != false);
+
+    std::cout << "Client propably disconnected.\n";
+}
+
 int main(int argc, const char** argv) {
     // Read command line arguments
     ServerConfig config;
@@ -91,6 +98,8 @@ int main(int argc, const char** argv) {
         return EXIT_FAILURE;
     }
 
+    std::vector<std::thread> threads;
+
     Server server(config.protocol, config.port);
     server.SetHostDirectory(config.hostFilesDirectory);
 
@@ -101,16 +110,14 @@ int main(int argc, const char** argv) {
 
     std::cout << "Server listening at port: " << config.port << ".\n";
 
-    while (true) {
+    while(true) {
         const int clientIndex = server.Listen();
         if (clientIndex == Server::INVALID_CLIENT_INDEX) {
             std::cout << "Listen failed: " << Net::GetStatusName(server.Fail()) << ".\n";
             continue;
         }
 
-        while (server.Handle(clientIndex) != false);
-
-        std::cout << "Client disconnected.\n";
+        threads.push_back(std::thread(ClientHandleLoop, &server, clientIndex));
     }
 
     return EXIT_SUCCESS;

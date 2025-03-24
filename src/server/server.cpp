@@ -31,9 +31,9 @@ int Server::Listen() {
     if (clientConnection == nullptr) return INVALID_CLIENT_INDEX;
 
     const auto clientIndex = clients.size();
-    clients.push_back(ClientHandle(std::move(clientConnection)));
+    clients.push_back(new ClientHandle(std::move(clientConnection)));
 
-    ClientHandle& client = clients[clientIndex];
+    ClientHandle& client = *clients[clientIndex];
     std::cout << "Receive mac address...\n";
     client.connection->ReceiveAll(client.identifier);
 
@@ -72,7 +72,7 @@ fail_ret:
 }
 
 bool Server::Handle(unsigned int clientIndex) {
-    ClientHandle& client = clients[clientIndex];
+    ClientHandle& client = *clients[clientIndex];
 
     Msg::Packet* packet = reinterpret_cast<Msg::Packet*>(client.buffer);
     if (client.connection->ReceiveAll(*packet) < sizeof(*packet)) {
@@ -99,11 +99,13 @@ bool Server::CheckFail(ClientHandle& client) {
         case Net::Status::ConnectionRefused:
         case Net::Status::ConnectionReset: {
             // Swap remove.
-            auto it = std::find(clients.begin(), clients.end(), client);
+            auto it = std::find(clients.begin(), clients.end(), &client);
             auto last = std::prev(clients.end());
             if (it != last) std::iter_swap(it, last);
 
+            delete clients.back();
             clients.pop_back();
+
             return false;
         }
         default:
@@ -192,6 +194,9 @@ sendPacket:
             recoveryStamps[client.identifier] = DownloadStamp{ filePath, startPos + response.totalSize - bytesToSend };
             return false;
         }
+
+        // ACK
+        if (!client.connection->Receive(client.buffer, 1)) return false;
 
         bytesToSend -= chunkSize;
     }

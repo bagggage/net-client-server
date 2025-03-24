@@ -54,7 +54,7 @@ private:
     };
 
     Net::Ptr<Net::Server> listenServer;
-    std::vector<ClientHandle> clients;
+    std::vector<ClientHandle*> clients;
     std::unordered_map<Net::MacAddress, DownloadStamp> recoveryStamps;
 
     Net::Address::port_t port;
@@ -74,7 +74,7 @@ public:
     inline void SetHostDirectory(std::string_view path) { hostDirectory = path; }
 
     inline Net::Status Fail() { return listenServer->Fail(); }
-    inline Net::Status ClientFail(unsigned int clientIndex) { return clients[clientIndex].connection->Fail(); }
+    inline Net::Status ClientFail(unsigned int clientIndex) { return clients[clientIndex]->connection->Fail(); }
 };
 
 #endif
