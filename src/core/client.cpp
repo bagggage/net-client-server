@@ -2,6 +2,8 @@
 
 #include "server.h"
 
+#include <iostream>
+
 using namespace Net;
 
 Ptr<Connection> TcpClient::Connect(const Address& address) {
@@ -18,9 +20,15 @@ Ptr<Connection> UdpClient::Connect(const Address& address) {
     if (!connection->socket.Connect(address)) return nullptr;
     if (!connection->Send(UdpServer::CONNECT_MAGIC, sizeof(UdpServer::CONNECT_MAGIC))) return nullptr;
 
-    char acceptBuffer[sizeof(UdpServer::ACCEPT_MAGIC)] = { 0 };
-    if (!connection->Receive(acceptBuffer, sizeof(acceptBuffer))) return nullptr;
-    if (strcmp(acceptBuffer, UdpServer::ACCEPT_MAGIC) != 0) return nullptr;
+    Address::port_t port;
+    if (!connection->ReceiveAll(&port, sizeof(port))) return nullptr;
+
+    std::cout << "Remoute port: " << port << ".\n";
+
+    Address newAddress = address;
+    newAddress.SetPort(port);
+
+    if (!connection->socket.Connect(newAddress)) return nullptr;
 
     return std::move(connection);
 }

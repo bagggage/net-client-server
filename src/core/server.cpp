@@ -1,5 +1,7 @@
 #include "server.h"
 
+#include <iostream>
+
 using namespace Net;
 
 static bool SocketOpenAndBind(Socket& socket, const Address& address, const Net::Protocol protocol) {
@@ -40,14 +42,23 @@ bool UdpServer::Bind(const Address& address) {
 }
 
 Ptr<Connection> UdpServer::Listen() {
-    Ptr<ClientConnection> clientConnection = std::make_unique<ClientConnection>();
-    char connectBuffer[sizeof(CONNECT_MAGIC)] = { 0 };
+    Ptr<SocketConnection> clientConnection = std::make_unique<SocketConnection>();
+    if (!clientConnection->socket.Open(Address::Family::IPv4, Protocol::UDP)) return nullptr;
 
-    socket.ReceiveFrom(connectBuffer, sizeof(connectBuffer), clientConnection->clientAddress, Socket::WaitAll);
+    char connectBuffer[sizeof(CONNECT_MAGIC)] = { 0 };
+    Address clientAddress;
+
+    socket.ReceiveFrom(connectBuffer, sizeof(connectBuffer), clientAddress, Socket::WaitAll);
     if (strcmp(connectBuffer, CONNECT_MAGIC) != 0) return nullptr;
 
-    clientConnection->serverSocket = &socket;
-    if (!clientConnection->Send(ACCEPT_MAGIC, sizeof(ACCEPT_MAGIC))) return nullptr;
+    if (!clientConnection->socket.Bind(Address::MakeBind(0, Protocol::UDP))) return nullptr;
+    if (!clientConnection->socket.Connect(clientAddress)) return nullptr;
+
+    const Address endpointAddress = clientConnection->socket.GetAddress();
+    const Address::port_t port = endpointAddress.GetPort();
+
+    std::cout << "endpoint port: " << port << ".\n";
+    if (!socket.SendTo(clientAddress, reinterpret_cast<const char*>(&port), sizeof(port))) return nullptr;
 
     return clientConnection;
 }

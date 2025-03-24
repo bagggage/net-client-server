@@ -39,6 +39,7 @@ namespace Net {
         friend class TcpClient;
         friend class UdpClient;
         friend class TcpServer;
+        friend class UdpServer;
     public:
         uint Send(const void* buffer, const unsigned int size) override {
             return socket.Send(reinterpret_cast<const char*>(buffer), size);
