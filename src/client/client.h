@@ -45,7 +45,10 @@ public:
     LoadResult HandleDownloadRecovery(std::string& outFileName);
     bool Close();
 
-    inline Net::Status GetStatus() const { return connection->Fail(); }
+    inline Net::Status GetStatus() const {
+        if (connection) return connection->Fail();
+        return Net::Status::ConnectionRefused;
+    }
 };
 
 #endif // _CLIENT_H

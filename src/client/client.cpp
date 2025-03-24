@@ -39,7 +39,7 @@ Client::LoadResult Client::HandleDownloadRecovery(std::string& outFileName) {
 }
 
 bool Client::Connect(const Net::Protocol protocol, const std::string& address, unsigned short port) {
-    const Net::Address serverAddress = Net::Address::FromDomain(address.c_str(), port);
+    Net::Address serverAddress = Net::Address::FromDomain(address.c_str(), port);
 
     if (protocol == Net::Protocol::TCP) {
         connection = Net::TcpClient::Connect(serverAddress);
@@ -47,7 +47,7 @@ bool Client::Connect(const Net::Protocol protocol, const std::string& address, u
         connection = Net::UdpClient::Connect(serverAddress);
     }
 
-    if (connection->Fail()) return false;
+    if (connection == nullptr || connection->Fail()) return false;
 
     std::cout << "Send mac address.\n";
 
@@ -119,6 +119,8 @@ Client::LoadResult Client::Download(const std::string_view fileName, const size_
                 const uint received = connection->Receive(buffer.data(), chunkSize);
     
                 if (received == 0) goto ret;
+                // ACK
+                if (!connection->Send(buffer.data(), 1)) goto ret;
 
                 fileStream.write(buffer.data(), received);
                 bytesToReceive -= received;
