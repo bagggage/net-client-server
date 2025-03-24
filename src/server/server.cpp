@@ -216,7 +216,7 @@ bool Server::HandleUpload(ClientHandle& client, const Msg::Request::Upload* requ
         while (bytesToReceive > 0) {
             const size_t chunkSize = std::min(DEFAULT_BUFFER_SIZE, bytesToReceive);
 
-            uint received = client.connection->Receive(client.buffer, chunkSize);
+            uint received = client.connection->ReceiveAll(client.buffer, chunkSize);
             if (CheckFail(client)) [[unlikely]] return false;
 
             bytesToReceive -= received;

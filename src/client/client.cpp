@@ -116,8 +116,8 @@ Client::LoadResult Client::Download(const std::string_view fileName, const size_
             size_t bytesToReceive = response->totalSize;
             while (bytesToReceive > 0) {
                 const size_t chunkSize = std::min(buffer.size(), bytesToReceive);
-                const uint received = connection->Receive(buffer.data(), chunkSize);
-    
+                const uint received = connection->ReceiveAll(buffer.data(), chunkSize);
+
                 if (received == 0) goto ret;
                 // ACK
                 if (!connection->Send(buffer.data(), 1)) goto ret;
